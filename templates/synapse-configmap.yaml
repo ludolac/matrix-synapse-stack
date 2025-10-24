@@ -87,7 +87,7 @@ data:
       {{- range .Values.synapse.server.turn.uris }}
       - "{{ . }}"
       {{- end }}
-    turn_shared_secret: "{{ .Values.synapse.server.turn.sharedSecret }}"
+    turn_shared_secret: "${TURN_SHARED_SECRET}"
     turn_user_lifetime: "{{ .Values.synapse.server.turn.userLifetime }}"
     {{- end }}
 

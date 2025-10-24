@@ -109,11 +109,22 @@ synapse:
     urlPreviews:
       enabled: true
 
-    # Turn configuration for VoIP
+    # TURN server configuration for VoIP/Video calls
+    # TURN (Traversal Using Relays around NAT) is required for WebRTC calls to work
+    # when users are behind NAT/firewalls
     turn:
       enabled: false
+      # TURN server URIs - supports both UDP/TCP and secure TURNS
       uris: []
-      sharedSecret: ""
+        # - "turn:turn.example.com:3478?transport=udp"
+        # - "turn:turn.example.com:3478?transport=tcp"
+        # - "turns:turn.example.com:5349?transport=udp"  # Secure TURN over TLS
+        # - "turns:turn.example.com:5349?transport=tcp"
+      # Shared secret is read from Kubernetes secret: matrix-synapse-turn-credentials
+      # Generate with: ./scripts/generate-secrets.sh turn
+      # DO NOT set sharedSecret here - it's automatically injected from the secret
+      sharedSecret: ""  # Deprecated - will be removed, use Kubernetes secret
+      # How long TURN credentials are valid
       userLifetime: "1h"
 
     # Email configuration

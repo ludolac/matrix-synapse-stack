@@ -54,7 +54,8 @@ spec:
               cat /config/homeserver-override.yaml | \
                 sed "s|\${POSTGRES_PASSWORD}|${POSTGRES_PASSWORD}|g" | \
                 sed "s|\${REGISTRATION_SHARED_SECRET}|${REGISTRATION_SHARED_SECRET}|g" | \
-                sed "s|\${AUTHELIA_CLIENT_SECRET}|${AUTHELIA_CLIENT_SECRET}|g" > /data/homeserver-override.yaml
+                sed "s|\${AUTHELIA_CLIENT_SECRET}|${AUTHELIA_CLIENT_SECRET}|g" | \
+                sed "s|\${TURN_SHARED_SECRET}|${TURN_SHARED_SECRET}|g" > /data/homeserver-override.yaml
 
               echo "Configuration ready"
           env:
@@ -78,6 +79,13 @@ spec:
                   name: {{ include "matrix-synapse.fullname" . }}-sso-credentials
                   key: authelia-client-secret
             {{- end }}
+            {{- end }}
+            {{- if .Values.synapse.server.turn.enabled }}
+            - name: TURN_SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "matrix-synapse.fullname" . }}-turn-credentials
+                  key: shared-secret
             {{- end }}
           volumeMounts:
             - name: synapse-config

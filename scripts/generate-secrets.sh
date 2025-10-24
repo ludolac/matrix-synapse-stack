@@ -31,9 +31,10 @@ Matrix Synapse Secrets Management
 Usage: $0 [command]
 
 Commands:
-    all         Generate all secrets (PostgreSQL + Admin)
+    all         Generate all secrets (PostgreSQL + Admin + TURN)
     postgres    Generate PostgreSQL credentials only
-    admin       Generate admin user credentials only  
+    admin       Generate admin user credentials only
+    turn        Generate TURN server shared secret only
     list        List all existing secrets
     verify      Verify required secrets exist
     export      Export secrets to files
@@ -161,6 +162,84 @@ EOF
     print_info "Saved to: $SECRETS_DIR/admin-credentials.txt"
 }
 
+generate_turn_secret() {
+    local secret_name="${RELEASE_NAME}-turn-credentials"
+
+    print_info "Generating TURN server shared secret..."
+
+    if kubectl get secret "$secret_name" -n "$NAMESPACE" &> /dev/null; then
+        print_warning "Secret exists: $secret_name"
+        read -p "Recreate? (y/N): " -n 1 -r
+        echo
+        [[ ! $REPLY =~ ^[Yy]$ ]] && return 0
+        kubectl delete secret "$secret_name" -n "$NAMESPACE"
+    fi
+
+    local turn_shared_secret=$(generate_hex_secret)
+
+    kubectl create secret generic "$secret_name" \
+        --from-literal=shared-secret="$turn_shared_secret" \
+        --namespace="$NAMESPACE" \
+        --dry-run=client -o yaml | \
+    kubectl label --local -f - \
+        app.kubernetes.io/managed-by=Helm \
+        app.kubernetes.io/name=matrix-synapse \
+        app.kubernetes.io/instance="$RELEASE_NAME" \
+        --dry-run=client -o yaml | \
+    kubectl annotate --local -f - \
+        meta.helm.sh/release-name="$RELEASE_NAME" \
+        meta.helm.sh/release-namespace="$NAMESPACE" \
+        --dry-run=client -o yaml | \
+    kubectl apply -f -
+
+    print_success "TURN credentials created"
+
+    mkdir -p "$SECRETS_DIR"
+    cat > "$SECRETS_DIR/turn-credentials.txt" << EOF
+TURN Server Credentials
+=======================
+Generated: $(date)
+
+Shared Secret: $turn_shared_secret
+
+Retrieve:
+  kubectl get secret $secret_name -n $NAMESPACE -o jsonpath='{.data.shared-secret}' | base64 -d
+
+Usage:
+  Configure this secret in your values.yaml:
+
+  synapse:
+    server:
+      turn:
+        enabled: true
+        uris:
+          - "turn:turn.example.com:3478?transport=udp"
+          - "turn:turn.example.com:3478?transport=tcp"
+          - "turns:turn.example.com:5349?transport=udp"
+          - "turns:turn.example.com:5349?transport=tcp"
+        # Secret will be read from Kubernetes secret automatically
+        userLifetime: "1h"
+
+  You also need to configure your TURN server (coturn) with this secret:
+
+  # In /etc/turnserver.conf
+  static-auth-secret=$turn_shared_secret
+EOF
+    chmod 600 "$SECRETS_DIR/turn-credentials.txt"
+
+    echo ""
+    echo "=========================================="
+    echo "  TURN Server Credentials"
+    echo "=========================================="
+    echo -e "${GREEN}Shared Secret:${NC} $turn_shared_secret"
+    echo "=========================================="
+    echo ""
+    print_info "Saved to: $SECRETS_DIR/turn-credentials.txt"
+    echo ""
+    print_warning "Important: Configure this secret in your TURN server (coturn)!"
+    print_info "Add to /etc/turnserver.conf: static-auth-secret=$turn_shared_secret"
+}
+
 list_secrets() {
     kubectl get secrets -n "$NAMESPACE" -l app.kubernetes.io/name=matrix-synapse
 }
@@ -181,6 +260,12 @@ verify_secrets() {
         print_warning "Admin credentials missing (optional)"
     fi
 
+    if kubectl get secret "${RELEASE_NAME}-turn-credentials" -n "$NAMESPACE" &> /dev/null; then
+        print_success "TURN credentials exist"
+    else
+        print_warning "TURN credentials missing (optional, needed for video/voice calls)"
+    fi
+
     [ "$all_exist" = true ]
 }
 
@@ -197,6 +282,12 @@ export_secrets() {
         echo "Password: $(kubectl get secret "${RELEASE_NAME}-admin-credentials" -n "$NAMESPACE" -o jsonpath='{.data.password}' | base64 -d)" >> "$SECRETS_DIR/admin-export.txt"
         chmod 600 "$SECRETS_DIR/admin-export.txt"
         print_success "Admin credentials exported"
+    fi
+
+    if kubectl get secret "${RELEASE_NAME}-turn-credentials" -n "$NAMESPACE" &> /dev/null; then
+        kubectl get secret "${RELEASE_NAME}-turn-credentials" -n "$NAMESPACE" -o jsonpath='{.data.shared-secret}' | base64 -d > "$SECRETS_DIR/turn-shared-secret.txt"
+        chmod 600 "$SECRETS_DIR/turn-shared-secret.txt"
+        print_success "TURN shared secret exported"
     fi
 }
 
@@ -215,9 +306,12 @@ case "${1:-help}" in
         generate_postgres_secret
         echo ""
         generate_admin_secret
+        echo ""
+        generate_turn_secret
         ;;
     postgres) ensure_namespace; generate_postgres_secret ;;
     admin) ensure_namespace; generate_admin_secret ;;
+    turn) ensure_namespace; generate_turn_secret ;;
     list) list_secrets ;;
     verify) verify_secrets ;;
     export) export_secrets ;;
