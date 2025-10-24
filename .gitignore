@@ -10,8 +10,11 @@ charts/
 # Temporary files
 *.tmp
 *.bak
+*.backup
 *.swp
 *~
+values-prod.yaml.bak
+values-prod.yaml.backup
 
 # OS files
 .DS_Store
