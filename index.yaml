@@ -3,7 +3,30 @@ entries:
   matrix-synapse:
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2025-10-24T06:48:26.472364846Z"
+    created: "2025-10-24T07:05:07.034363092Z"
+    description: A Helm chart for deploying Matrix Synapse with Element Web on Kubernetes
+    digest: 5d446f9dca1b727c8cc231ec59605224f9a6bfc0e49cdafdd08a8c0ecf89ab1f
+    home: https://matrix.org
+    keywords:
+    - matrix
+    - synapse
+    - element
+    - chat
+    - messaging
+    maintainers:
+    - email: contact@waadoo.ovh
+      name: WAADOO
+    name: matrix-synapse
+    sources:
+    - https://github.com/element-hq/synapse
+    - https://github.com/element-hq/element-web
+    type: application
+    urls:
+    - https://ludolac.github.io/matrix-synapse-stack/matrix-synapse-1.2.8.tgz
+    version: 1.2.8
+  - apiVersion: v2
+    appVersion: 1.140.0
+    created: "2025-10-24T07:05:07.032930643Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web on Kubernetes
     digest: 3a58f8a6e318a0c2e65f56956b24dfd9eeebc4c98edac7c8646088d2ade2986d
     home: https://matrix.org
@@ -26,7 +49,7 @@ entries:
     version: 1.2.6
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2025-10-24T06:48:26.466635424Z"
+    created: "2025-10-24T07:05:07.027113952Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web on Kubernetes
     digest: 7714f42a6e340ad7c6dff950b9e90ed8129b4dcad58d97b8de51792cc1165983
     home: https://matrix.org
@@ -49,7 +72,7 @@ entries:
     version: 1.2.5
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2025-10-24T06:48:26.461151471Z"
+    created: "2025-10-24T07:05:07.020493086Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web on Kubernetes
     digest: 36676cf556d2bdb446faa624ca4163123c234e3b98c691196c07ad0cf9bb97d8
     home: https://matrix.org
@@ -72,7 +95,7 @@ entries:
     version: 1.2.4
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2025-10-24T06:48:26.455657049Z"
+    created: "2025-10-24T07:05:07.013211495Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web on Kubernetes
     digest: 8d75070d35ed405abc28636e01b8d46bba4bf3dffb64b39f0ed9c4f4e15848c1
     home: https://matrix.org
@@ -95,7 +118,7 @@ entries:
     version: 1.2.3
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2025-10-24T06:48:26.450306212Z"
+    created: "2025-10-24T07:05:07.007644641Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web on Kubernetes
     digest: 23f3d820582576e3c1aa30febfef7fb150123fdeabc74e45cf59110fb01ad338
     home: https://matrix.org
@@ -118,7 +141,7 @@ entries:
     version: 1.2.2
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2025-10-24T06:48:26.445253998Z"
+    created: "2025-10-24T07:05:07.002415137Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web on Kubernetes
     digest: ba237f5b99684456c4a7194799fb1892594a1a0b4ec38cf26fe505d5d2b22c41
     home: https://matrix.org
@@ -141,7 +164,7 @@ entries:
     version: 1.2.1
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2025-10-24T06:48:26.439071267Z"
+    created: "2025-10-24T07:05:06.995862209Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web on Kubernetes
     digest: 504207d6925251fddf0ee35cc287ac08500970886620161de2f29f3545f059dd
     home: https://matrix.org
@@ -162,4 +185,4 @@ entries:
     urls:
     - https://ludolac.github.io/matrix-synapse-stack/matrix-synapse-1.2.0.tgz
     version: 1.2.0
-generated: "2025-10-24T06:48:26.433744281Z"
+generated: "2025-10-24T07:05:06.990663799Z"
