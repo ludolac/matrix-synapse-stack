@@ -1,5 +1,5 @@
-{{- $synapseHost := index .Values.ingress.synapse.hosts 0 | default (printf "%s-synapse" (include "matrix-synapse.fullname" .)) -}}
-{{- $elementHost := index .Values.ingress.element.hosts 0 | default (printf "%s-element" (include "matrix-synapse.fullname" .)) -}}
+{{- $synapseHost := .Values.ingress.synapse.host | default (printf "%s-synapse" (include "matrix-synapse.fullname" .)) -}}
+{{- $elementHost := .Values.ingress.element.host | default (printf "%s-element" (include "matrix-synapse.fullname" .)) -}}
 
 █▀▄▀█ ▄▀█ ▀█▀ █▀█ █ ▀▄▀   █▀ █▄█ █▄ █ ▄▀█ █▀█ █▀ █▀▀
 █ ▀ █ █▀█  █  █▀▄ █ █ █   ▄█  █  █ ▀█ █▀█ █▀▀ ▄█ ██▄
