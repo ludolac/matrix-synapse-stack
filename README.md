@@ -86,14 +86,16 @@ See the [Installation](#installation) section for detailed instructions.
 
 ## Features
 
-✅ **Matrix Synapse** v1.140.0 - Full-featured Matrix homeserver  
-✅ **Element Web** v1.12.2 - Modern web client  
-✅ **PostgreSQL 16** - Reliable database backend  
-✅ **Automated Secret Management** - Scripts for credential generation  
-✅ **Admin User Creation** - Post-install job creates admin automatically  
-✅ **Ingress Support** - traefik ingress with TLS  
-✅ **Persistent Storage** - Longhorn/PVC for data persistence  
-✅ **Metrics & Monitoring** - Prometheus metrics enabled  
+✅ **Matrix Synapse** v1.140.0 - Full-featured Matrix homeserver
+✅ **Element Web** v1.12.2 - Modern web client
+✅ **PostgreSQL 16** - Reliable database backend
+✅ **Coturn TURN Server** - Integrated WebRTC support for video/voice calls
+✅ **Automated Secret Management** - Scripts for credential generation
+✅ **Admin User Creation** - Post-install job creates admin automatically
+✅ **Ingress Support** - traefik ingress with TLS
+✅ **Persistent Storage** - Longhorn/PVC for data persistence
+✅ **Security Hardened** - Network policies, pod security, secret management
+✅ **Metrics & Monitoring** - Prometheus metrics enabled
 ✅ **Production Ready** - Tested configuration with best practices  
 
 ---
@@ -530,6 +532,238 @@ element:
 ### Full Configuration Reference
 
 See `values.yaml` for all available configuration options with detailed comments.
+
+---
+
+## Coturn TURN Server (Video/Voice Calls)
+
+The Helm chart includes an integrated Coturn TURN server for WebRTC video and voice calls. TURN (Traversal Using Relays around NAT) is required for calls to work when users are behind NAT/firewalls.
+
+### Quick Start
+
+**1. Generate TURN shared secret:**
+```bash
+./scripts/generate-secrets.sh turn
+```
+
+**2. Enable coturn in `values-prod.yaml`:**
+```yaml
+coturn:
+  enabled: true
+  externalIP: "YOUR_PUBLIC_IP"  # Public IP for TURN relay
+  realm: "turn.waadoo.ovh"
+
+  service:
+    type: LoadBalancer  # or NodePort
+    externalDns:
+      enabled: true
+      hostname: "turn.waadoo.ovh"
+
+  ingress:
+    enabled: true
+    hostname: "turn.waadoo.ovh"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+```
+
+**3. Deploy:**
+```bash
+helm upgrade matrix-synapse . -n matrix -f values-prod.yaml
+```
+
+### How It Works
+
+- **Automatic Integration**: When `coturn.enabled: true`, Synapse automatically configures TURN URIs pointing to the internal coturn service
+- **Shared Secret**: Both Synapse and Coturn use the same shared secret from Kubernetes secret `matrix-synapse-turn-credentials`
+- **No Manual Configuration**: The TURN shared secret is automatically injected into both Synapse and Coturn configurations
+
+### Architecture
+
+```
+┌─────────────┐
+│ Element Web │
+└──────┬──────┘
+       │ WebRTC
+       ↓
+┌─────────────┐    turn_uris     ┌────────────┐
+│   Synapse   │ ←───────────────→ │   Coturn   │
+└─────────────┘  shared_secret   └─────┬──────┘
+                                       │
+                                  Relay Media
+                                       ↓
+                                  Public IP
+```
+
+### Security Features
+
+✅ **Shared Secret Auth**: Uses cryptographically secure shared secret
+✅ **Private IP Blocking**: Prevents relay to private/loopback addresses
+✅ **TLS Support**: TURNS (secure TURN) with certificate
+✅ **User Quotas**: Limits to prevent abuse
+✅ **Unprivileged User**: Runs as `nobody:nogroup`
+✅ **Read-Only Filesystem**: Container security hardening
+
+### Network Requirements
+
+**Ports that need to be open:**
+- `3478/UDP` - TURN (UDP)
+- `3478/TCP` - TURN (TCP)
+- `5349/UDP` - TURNS (secure, UDP)
+- `5349/TCP` - TURNS (secure, TCP)
+- `49152-49252/UDP` - Media relay ports (configurable)
+
+**Service Types:**
+
+| Type | Use Case | External IP |
+|------|----------|-------------|
+| **LoadBalancer** | Cloud providers (AWS/GCP/Azure) | Auto-assigned |
+| **NodePort** | On-premises, MetalLB | Node IP |
+| **ClusterIP** | Internal only (testing) | No external access |
+
+### Configuration Examples
+
+**Minimal (internal only):**
+```yaml
+coturn:
+  enabled: true
+  externalIP: "192.168.1.100"
+  realm: "turn.example.com"
+```
+
+**Production with LoadBalancer:**
+```yaml
+coturn:
+  enabled: true
+  externalIP: "203.0.113.50"
+  realm: "turn.waadoo.ovh"
+
+  service:
+    type: LoadBalancer
+    loadBalancerIP: "203.0.113.50"
+    externalDns:
+      enabled: true
+      hostname: "turn.waadoo.ovh"
+      ttl: 300
+
+  tls:
+    enabled: true
+    secretName: "coturn-tls"
+
+  ingress:
+    enabled: true
+    hostname: "turn.waadoo.ovh"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 256Mi
+```
+
+**Production with NodePort:**
+```yaml
+coturn:
+  enabled: true
+  externalIP: "203.0.113.50"
+  realm: "turn.waadoo.ovh"
+
+  service:
+    type: NodePort
+    nodePorts:
+      turnUdp: 30478
+      turnTcp: 30478
+      turnsUdp: 30349
+      turnsTcp: 30349
+```
+
+### Firewall Configuration
+
+**iptables example:**
+```bash
+# TURN ports
+iptables -A INPUT -p udp --dport 3478 -j ACCEPT
+iptables -A INPUT -p tcp --dport 3478 -j ACCEPT
+iptables -A INPUT -p udp --dport 5349 -j ACCEPT
+iptables -A INPUT -p tcp --dport 5349 -j ACCEPT
+
+# Media relay ports
+iptables -A INPUT -p udp --dport 49152:49252 -j ACCEPT
+```
+
+**cloud-init / security groups:**
+- Allow inbound UDP/TCP 3478, 5349
+- Allow inbound UDP 49152-49252
+- Allow all outbound
+
+### Troubleshooting
+
+**Test TURN connectivity:**
+```bash
+# Check if coturn pod is running
+kubectl get pods -n matrix | grep coturn
+
+# Check coturn logs
+kubectl logs -n matrix deployment/matrix-synapse-coturn
+
+# Test TURN port
+nc -zv turn.waadoo.ovh 3478
+
+# Verify Synapse sees coturn
+kubectl exec -n matrix deployment/matrix-synapse-synapse -- \
+  cat /data/homeserver-override.yaml | grep -A 10 turn_uris
+```
+
+**Common issues:**
+
+1. **Calls fail immediately**
+   - Check TURN shared secret matches in both Synapse and Coturn
+   - Verify `kubectl get secret matrix-synapse-turn-credentials -n matrix`
+
+2. **One-way audio/video**
+   - External IP not configured correctly
+   - Firewall blocking media relay ports (49152-49252)
+
+3. **TURN server unreachable**
+   - LoadBalancer IP not assigned
+   - DNS record not created (check external-dns logs)
+   - Ports not open in cloud security groups
+
+**Enable debug logging:**
+```yaml
+coturn:
+  extraConfig: |
+    verbose
+    log-file=stdout
+```
+
+### Using External TURN Server
+
+If you prefer to use an external TURN server instead of the integrated coturn:
+
+```yaml
+coturn:
+  enabled: false  # Disable integrated coturn
+
+synapse:
+  server:
+    turn:
+      enabled: true
+      uris:
+        - "turn:turn.example.com:3478?transport=udp"
+        - "turn:turn.example.com:3478?transport=tcp"
+        - "turns:turn.example.com:5349?transport=tcp"
+      userLifetime: "1h"
+```
+
+Then configure the TURN shared secret from Kubernetes:
+```bash
+./scripts/generate-secrets.sh turn
+# Use the secret on your external TURN server
+```
 
 ---
 

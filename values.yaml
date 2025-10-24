@@ -520,3 +520,157 @@ postgresql:
     walLevel: "minimal"
     maxWalSenders: 0
     logMinDurationStatement: 1000
+
+# Coturn TURN Server Configuration
+# Integrated TURN server for WebRTC video/voice calls
+# Automatically configured with Matrix Synapse
+coturn:
+  # Enable coturn TURN server deployment
+  enabled: false
+  
+  # Number of coturn replicas
+  replicaCount: 1
+  
+  # Coturn container image
+  image:
+    repository: coturn/coturn
+    tag: "4.6-alpine"
+    pullPolicy: IfNotPresent
+  
+  imagePullSecrets: []
+  
+  # External IP address for TURN relay
+  # This should be the public IP where clients can reach the TURN server
+  externalIP: ""
+  
+  # Realm for TURN authentication
+  # Usually matches your domain
+  realm: "turn.example.com"
+  
+  # Relay port range for media traffic
+  # These ports need to be opened in firewall/security groups
+  relayPortRange:
+    min: 49152
+    max: 49252  # 100 ports (adjust based on expected concurrent calls)
+  
+  # Security: User and group to run coturn as
+  user: "nobody"
+  group: "nogroup"
+  
+  # Resource quotas to prevent abuse
+  userQuota: 0        # 0 = no per-user quota
+  totalQuota: 100     # Maximum 100 concurrent sessions
+  
+  # Bandwidth limits (bytes per second)
+  maxBps: 0           # 0 = no per-session limit
+  bpsCapacity: 0      # 0 = no total capacity limit
+  
+  # TLS configuration for TURNS (secure TURN)
+  tls:
+    enabled: false
+    # Name of the Kubernetes secret containing tls.crt and tls.key
+    secretName: "coturn-tls"
+  
+  # Prometheus metrics exporter
+  prometheusExporter:
+    enabled: false
+    port: 9641
+  
+  # Service configuration
+  service:
+    # Service type: LoadBalancer, NodePort, or ClusterIP
+    type: LoadBalancer
+    
+    # Load balancer IP (optional)
+    loadBalancerIP: ""
+    
+    # External traffic policy (Local or Cluster)
+    # Local preserves source IP but requires externalTrafficPolicy support
+    externalTrafficPolicy: "Cluster"
+    
+    # External IPs for the service (optional)
+    externalIPs: []
+    
+    # NodePort configuration (when type=NodePort)
+    nodePorts:
+      turnUdp: null   # e.g., 30478
+      turnTcp: null
+      turnsUdp: null  # e.g., 30349
+      turnsTcp: null
+    
+    # Service annotations
+    annotations: {}
+      # metallb.universe.tf/address-pool: default
+      # metallb.universe.tf/allow-shared-ip: coturn
+    
+    # external-dns configuration
+    externalDns:
+      enabled: false
+      hostname: "turn.example.com"
+      ttl: 300
+  
+  # Ingress configuration for TURNS (TLS)
+  # Note: Ingress typically only handles HTTPS/TCP, not UDP
+  # For full functionality, use LoadBalancer or NodePort service
+  ingress:
+    enabled: false
+    ingressClassName: ""
+    hostname: "turn.example.com"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+      traefik.ingress.kubernetes.io/router.tls: "true"
+    tls:
+      secretName: "coturn-tls"
+  
+  # Pod annotations
+  podAnnotations: {}
+    # prometheus.io/scrape: "true"
+    # prometheus.io/port: "9641"
+  
+  # Pod security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65534  # nobody
+    runAsGroup: 65534
+    fsGroup: 65534
+    seccompProfile:
+      type: RuntimeDefault
+  
+  # Container security context
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+      add:
+        - NET_BIND_SERVICE  # Required for binding to ports < 1024
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 65534
+  
+  # Resource limits and requests
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 128Mi
+  
+  # Node selector
+  nodeSelector: {}
+  
+  # Tolerations
+  tolerations: []
+  
+  # Affinity
+  affinity: {}
+  
+  # Extra configuration to append to turnserver.conf
+  extraConfig: ""
+    # Example:
+    # |
+    # # Custom configuration
+    # cli-password=mypassword
+

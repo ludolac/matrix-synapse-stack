@@ -1,0 +1,110 @@
+{{- if .Values.coturn.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-coturn
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: coturn
+spec:
+  replicas: {{ .Values.coturn.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "matrix-synapse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: coturn
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/coturn-configmap.yaml") . | sha256sum }}
+        {{- with .Values.coturn.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "matrix-synapse.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: coturn
+    spec:
+      {{- with .Values.coturn.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "matrix-synapse.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.coturn.podSecurityContext | nindent 8 }}
+      containers:
+        - name: coturn
+          securityContext:
+            {{- toYaml .Values.coturn.securityContext | nindent 12 }}
+          image: "{{ .Values.coturn.image.repository }}:{{ .Values.coturn.image.tag }}"
+          imagePullPolicy: {{ .Values.coturn.image.pullPolicy }}
+          env:
+            - name: TURN_SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "matrix-synapse.fullname" . }}-turn-credentials
+                  key: shared-secret
+            {{- if .Values.coturn.realm }}
+            - name: REALM
+              value: {{ .Values.coturn.realm | quote }}
+            {{- end }}
+          ports:
+            - name: turn-udp
+              containerPort: 3478
+              protocol: UDP
+            - name: turn-tcp
+              containerPort: 3478
+              protocol: TCP
+            - name: turns-udp
+              containerPort: 5349
+              protocol: UDP
+            - name: turns-tcp
+              containerPort: 5349
+              protocol: TCP
+            {{- if .Values.coturn.prometheusExporter.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.coturn.prometheusExporter.port }}
+              protocol: TCP
+            {{- end }}
+          volumeMounts:
+            - name: coturn-config
+              mountPath: /etc/coturn
+              readOnly: true
+            {{- if .Values.coturn.tls.enabled }}
+            - name: tls-certs
+              mountPath: /etc/coturn/certs
+              readOnly: true
+            {{- end }}
+          resources:
+            {{- toYaml .Values.coturn.resources | nindent 12 }}
+          livenessProbe:
+            tcpSocket:
+              port: turn-tcp
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: turn-tcp
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: coturn-config
+          configMap:
+            name: {{ include "matrix-synapse.fullname" . }}-coturn-config
+        {{- if .Values.coturn.tls.enabled }}
+        - name: tls-certs
+          secret:
+            secretName: {{ .Values.coturn.tls.secretName }}
+        {{- end }}
+      {{- with .Values.coturn.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.coturn.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.coturn.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

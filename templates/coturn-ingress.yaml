@@ -1,0 +1,33 @@
+{{- if and .Values.coturn.enabled .Values.coturn.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-coturn
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: coturn
+  annotations:
+    {{- with .Values.coturn.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if .Values.coturn.ingress.ingressClassName }}
+  ingressClassName: {{ .Values.coturn.ingress.ingressClassName }}
+  {{- end }}
+  tls:
+    - hosts:
+        - {{ .Values.coturn.ingress.hostname }}
+      secretName: {{ .Values.coturn.ingress.tls.secretName }}
+  rules:
+    - host: {{ .Values.coturn.ingress.hostname }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "matrix-synapse.fullname" . }}-coturn
+                port:
+                  name: turns-tcp
+{{- end }}

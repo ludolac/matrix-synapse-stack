@@ -82,10 +82,26 @@ data:
     {{- end }}
 
     # TURN server configuration
-    {{- if .Values.synapse.server.turn.enabled }}
+    {{- if or .Values.synapse.server.turn.enabled .Values.coturn.enabled }}
     turn_uris:
+      {{- if .Values.coturn.enabled }}
+      # Auto-configured internal coturn service
+      - "turn:{{ include "matrix-synapse.fullname" . }}-coturn.{{ .Release.Namespace }}.svc.cluster.local:3478?transport=udp"
+      - "turn:{{ include "matrix-synapse.fullname" . }}-coturn.{{ .Release.Namespace }}.svc.cluster.local:3478?transport=tcp"
+      {{- if .Values.coturn.tls.enabled }}
+      - "turns:{{ include "matrix-synapse.fullname" . }}-coturn.{{ .Release.Namespace }}.svc.cluster.local:5349?transport=udp"
+      - "turns:{{ include "matrix-synapse.fullname" . }}-coturn.{{ .Release.Namespace }}.svc.cluster.local:5349?transport=tcp"
+      {{- end }}
+      {{- if .Values.coturn.ingress.enabled }}
+      # Public TURNS endpoint via ingress
+      - "turns:{{ .Values.coturn.ingress.hostname }}:5349?transport=tcp"
+      {{- end }}
+      {{- end }}
+      {{- if .Values.synapse.server.turn.enabled }}
+      # User-configured external TURN URIs
       {{- range .Values.synapse.server.turn.uris }}
       - "{{ . }}"
+      {{- end }}
       {{- end }}
     turn_shared_secret: "${TURN_SHARED_SECRET}"
     turn_user_lifetime: "{{ .Values.synapse.server.turn.userLifetime }}"
