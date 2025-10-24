@@ -301,3 +301,75 @@ jobs:
         with:
           name: security-summary
           path: security-summary.md
+
+      - name: Update README with scan results
+        if: github.ref == 'refs/heads/main'
+        run: |
+          # Read current README
+          cp README.md README.md.backup
+
+          # Create badge URLs with real counts
+          CONFIG_CRIT_BADGE="![Critical](https://img.shields.io/badge/critical-${{ steps.badge.outputs.config_critical }}-$([ ${{ steps.badge.outputs.config_critical }} -eq 0 ] && echo 'success' || echo 'critical'))"
+          CONFIG_HIGH_BADGE="![High](https://img.shields.io/badge/high-${{ steps.badge.outputs.config_high }}-$([ ${{ steps.badge.outputs.config_high }} -eq 0 ] && echo 'success' || echo 'important'))"
+          CONFIG_MED_BADGE="![Medium](https://img.shields.io/badge/medium-${{ steps.badge.outputs.config_medium }}-$([ ${{ steps.badge.outputs.config_medium }} -eq 0 ] && echo 'success' || echo 'orange'))"
+          CONFIG_LOW_BADGE="![Low](https://img.shields.io/badge/low-${{ steps.badge.outputs.config_low }}-informational)"
+
+          IMAGE_CRIT_BADGE="![Critical](https://img.shields.io/badge/critical-${{ steps.badge.outputs.image_critical }}-$([ ${{ steps.badge.outputs.image_critical }} -eq 0 ] && echo 'success' || echo 'critical'))"
+          IMAGE_HIGH_BADGE="![High](https://img.shields.io/badge/high-${{ steps.badge.outputs.image_high }}-$([ ${{ steps.badge.outputs.image_high }} -eq 0 ] && echo 'success' || echo 'important'))"
+          IMAGE_MED_BADGE="![Medium](https://img.shields.io/badge/medium-${{ steps.badge.outputs.image_medium }}-$([ ${{ steps.badge.outputs.image_medium }} -eq 0 ] && echo 'success' || echo 'orange'))"
+          IMAGE_LOW_BADGE="![Low](https://img.shields.io/badge/low-${{ steps.badge.outputs.image_low }}-informational)"
+
+          # Extract per-image counts
+          SYNAPSE_CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' image-scans/trivy-synapse-json/trivy-synapse.json 2>/dev/null || echo 0)
+          SYNAPSE_HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' image-scans/trivy-synapse-json/trivy-synapse.json 2>/dev/null || echo 0)
+          SYNAPSE_MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' image-scans/trivy-synapse-json/trivy-synapse.json 2>/dev/null || echo 0)
+          SYNAPSE_LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' image-scans/trivy-synapse-json/trivy-synapse.json 2>/dev/null || echo 0)
+
+          ELEMENT_CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' image-scans/trivy-element-web-json/trivy-element-web.json 2>/dev/null || echo 0)
+          ELEMENT_HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' image-scans/trivy-element-web-json/trivy-element-web.json 2>/dev/null || echo 0)
+          ELEMENT_MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' image-scans/trivy-element-web-json/trivy-element-web.json 2>/dev/null || echo 0)
+          ELEMENT_LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' image-scans/trivy-element-web-json/trivy-element-web.json 2>/dev/null || echo 0)
+
+          POSTGRES_CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' image-scans/trivy-postgresql-json/trivy-postgresql.json 2>/dev/null || echo 0)
+          POSTGRES_HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' image-scans/trivy-postgresql-json/trivy-postgresql.json 2>/dev/null || echo 0)
+          POSTGRES_MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' image-scans/trivy-postgresql-json/trivy-postgresql.json 2>/dev/null || echo 0)
+          POSTGRES_LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' image-scans/trivy-postgresql-json/trivy-postgresql.json 2>/dev/null || echo 0)
+
+          # Update README with sed (replace the Overall Security Status table)
+          sed -i "/^| \*\*Configuration\*\* |/c\| **Configuration** | ![Status](https://img.shields.io/badge/status-scanned-success) | Daily at 2AM UTC | $CONFIG_CRIT_BADGE | $CONFIG_HIGH_BADGE | $CONFIG_MED_BADGE | $CONFIG_LOW_BADGE |" README.md
+          sed -i "/^| \*\*Helm Manifests\*\* |/c\| **Helm Manifests** | ![Status](https://img.shields.io/badge/status-scanned-success) | On every push | $CONFIG_CRIT_BADGE | $CONFIG_HIGH_BADGE | $CONFIG_MED_BADGE | $CONFIG_LOW_BADGE |" README.md
+          sed -i "/^| \*\*Container Images\*\* |/c\| **Container Images** | ![Status](https://img.shields.io/badge/status-scanned-success) | Daily + On Push | $IMAGE_CRIT_BADGE | $IMAGE_HIGH_BADGE | $IMAGE_MED_BADGE | $IMAGE_LOW_BADGE |" README.md
+
+          # Update per-image table
+          sed -i "/^| \*\*Synapse\*\* | v1.140.0 |/c\| **Synapse** | v1.140.0 | ![Critical](https://img.shields.io/badge/critical-${SYNAPSE_CRIT}-$([ ${SYNAPSE_CRIT} -eq 0 ] && echo 'success' || echo 'critical')) | ![High](https://img.shields.io/badge/high-${SYNAPSE_HIGH}-$([ ${SYNAPSE_HIGH} -eq 0 ] && echo 'success' || echo 'important')) | ![Medium](https://img.shields.io/badge/medium-${SYNAPSE_MED}-$([ ${SYNAPSE_MED} -eq 0 ] && echo 'success' || echo 'orange')) | ![Low](https://img.shields.io/badge/low-${SYNAPSE_LOW}-informational) |" README.md
+
+          sed -i "/^| \*\*Element Web\*\* | v1.12.2 |/c\| **Element Web** | v1.12.2 | ![Critical](https://img.shields.io/badge/critical-${ELEMENT_CRIT}-$([ ${ELEMENT_CRIT} -eq 0 ] && echo 'success' || echo 'critical')) | ![High](https://img.shields.io/badge/high-${ELEMENT_HIGH}-$([ ${ELEMENT_HIGH} -eq 0 ] && echo 'success' || echo 'important')) | ![Medium](https://img.shields.io/badge/medium-${ELEMENT_MED}-$([ ${ELEMENT_MED} -eq 0 ] && echo 'success' || echo 'orange')) | ![Low](https://img.shields.io/badge/low-${ELEMENT_LOW}-informational) |" README.md
+
+          sed -i "/^| \*\*PostgreSQL\*\* | 16-alpine |/c\| **PostgreSQL** | 16-alpine | ![Critical](https://img.shields.io/badge/critical-${POSTGRES_CRIT}-$([ ${POSTGRES_CRIT} -eq 0 ] && echo 'success' || echo 'critical')) | ![High](https://img.shields.io/badge/high-${POSTGRES_HIGH}-$([ ${POSTGRES_HIGH} -eq 0 ] && echo 'success' || echo 'important')) | ![Medium](https://img.shields.io/badge/medium-${POSTGRES_MED}-$([ ${POSTGRES_MED} -eq 0 ] && echo 'success' || echo 'orange')) | ![Low](https://img.shields.io/badge/low-${POSTGRES_LOW}-informational) |" README.md
+
+          # Show diff
+          echo "README changes:"
+          diff README.md.backup README.md || true
+
+      - name: Commit updated README
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          if git diff --quiet README.md; then
+            echo "No changes to README"
+          else
+            git add README.md
+            git commit -m "$(cat <<'EOF'
+          chore: update security scan results in README [skip ci]
+
+          Auto-updated vulnerability counts from Trivy scan:
+          - Configuration: ${{ steps.badge.outputs.config_critical }}C/${{ steps.badge.outputs.config_high }}H/${{ steps.badge.outputs.config_medium }}M
+          - Images: ${{ steps.badge.outputs.image_critical }}C/${{ steps.badge.outputs.image_high }}H/${{ steps.badge.outputs.image_medium }}M
+
+          🤖 Generated by GitHub Actions
+          EOF
+          )"
+            git push
+          fi
