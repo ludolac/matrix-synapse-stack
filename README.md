@@ -2,6 +2,8 @@
 
 Production-ready Helm chart for deploying Matrix Synapse homeserver with Element Web client on Kubernetes.
 
+[![Helm Chart](https://img.shields.io/badge/helm-chart-blue)](https://ludolac.github.io/matrix-synapse-stack/)
+
 ## Installation
 
 ```bash
