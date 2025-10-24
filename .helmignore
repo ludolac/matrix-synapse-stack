@@ -19,21 +19,19 @@
 *~
 .DS_Store
 
-# Documentation and guides (not needed in package)
-*.md
-!Chart.yaml
-!values.yaml
-!values-prod.yaml
-
 # CI/CD files
 .github/
 .gitlab-ci.yml
 .travis.yml
 .circleci/
 
-# Scripts (not needed in Helm package)
+# Scripts directory (backup/restore scripts not needed in package)
 scripts/
-*.sh
+
+# Production values file (users should provide their own)
+values-prod.yaml
+values-prod.yaml.bak
+values-prod.yaml.backup
 
 # Backup and secrets directories
 .backup/
@@ -61,19 +59,13 @@ Thumbs.db
 *.orig
 *.rej
 
-# Production values file (use your own, don't package it)
-values-prod.yaml
-values-prod.yaml.bak
-values-prod.yaml.backup
-
-# Other Helm charts
+# Other Helm charts (dependencies)
 charts/
 *.tgz
 
-# License and readme (already in Chart.yaml metadata)
-LICENSE
-README.md
-CONTRIBUTING.md
-CODE_OF_CONDUCT.md
-CHANGELOG.md
-SECURITY.md
+# Documentation files (keep them minimal)
+scripts/BACKUP-RESTORE.md
+2FA-USER-GUIDE.md
+AUTHELIA-SSO-SETUP.md
+MAS-INTEGRATION-GUIDE.md
+SSO-CONFIGURATION.md
