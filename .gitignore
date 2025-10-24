@@ -3,6 +3,11 @@
 *.txt
 *.key
 
+# Backup directory
+.backup/
+*.sql
+*.sql.gz
+
 # Helm packaging
 *.tgz
 charts/
