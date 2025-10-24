@@ -1,0 +1,45 @@
+{{- if .Values.postgresql.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-postgresql-config
+  labels:
+    {{- include "matrix-synapse.postgresql.labels" . | nindent 4 }}
+data:
+  postgresql.conf: |
+    # PostgreSQL Configuration for Matrix Synapse
+    # Optimized for Synapse workload
+
+    # Connection Settings
+    max_connections = {{ .Values.postgresql.config.maxConnections }}
+    superuser_reserved_connections = 3
+
+    # Memory Settings
+    shared_buffers = {{ .Values.postgresql.config.sharedBuffers }}
+    effective_cache_size = {{ .Values.postgresql.config.effectiveCacheSize }}
+    maintenance_work_mem = {{ .Values.postgresql.config.maintenanceWorkMem }}
+    work_mem = {{ .Values.postgresql.config.workMem }}
+
+    # WAL Settings (minimal for single-instance)
+    wal_level = {{ .Values.postgresql.config.walLevel }}
+    max_wal_senders = {{ .Values.postgresql.config.maxWalSenders }}
+
+    # Query Tuning
+    random_page_cost = 1.1
+    effective_io_concurrency = 200
+
+    # Logging
+    log_min_duration_statement = {{ .Values.postgresql.config.logMinDurationStatement }}
+    log_connections = on
+    log_disconnections = on
+    log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+
+    # Locale and Encoding
+    lc_messages = 'C'
+    lc_monetary = 'C'
+    lc_numeric = 'C'
+    lc_time = 'C'
+
+    # Other Settings
+    default_text_search_config = 'pg_catalog.english'
+{{- end }}

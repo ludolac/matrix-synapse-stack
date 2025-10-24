@@ -1,0 +1,243 @@
+{{- if .Values.networkPolicy.enabled }}
+# NetworkPolicy for Synapse homeserver
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-synapse
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: synapse
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "matrix-synapse.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: synapse
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from Traefik ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingress.traefik.namespaceSelector | nindent 14 }}
+        {{- if .Values.networkPolicy.ingress.traefik.podSelector }}
+        - podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingress.traefik.podSelector | nindent 14 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 8008
+        - protocol: TCP
+          port: 8448
+    # Allow from Element Web
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: element-web
+      ports:
+        - protocol: TCP
+          port: 8008
+    # Allow from admin-user-setup job
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: admin-user-setup
+      ports:
+        - protocol: TCP
+          port: 8008
+    # Allow metrics scraping
+    {{- if .Values.synapse.metrics.enabled }}
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.synapse.metrics.port }}
+    {{- end }}
+  egress:
+    # Allow DNS (both UDP and TCP)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow HTTPS for federation and external services (including SSO)
+    # No 'to' selector = allow to any destination (cluster and external)
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 8448
+    {{- if .Values.synapse.server.email.enabled }}
+    # Allow SMTP for email
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.synapse.server.email.smtpPort }}
+    {{- end }}
+---
+# NetworkPolicy for Element Web
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-element
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: element-web
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: element-web
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from Traefik ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingress.traefik.namespaceSelector | nindent 14 }}
+        {{- if .Values.networkPolicy.ingress.traefik.podSelector }}
+        - podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingress.traefik.podSelector | nindent 14 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 80
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow Synapse homeserver
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: synapse
+      ports:
+        - protocol: TCP
+          port: 8008
+    # Allow external CDN and services
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+---
+# NetworkPolicy for PostgreSQL
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-postgresql
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: postgresql
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from Synapse
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: synapse
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow from password-fix job (post-install/post-upgrade hook)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: postgresql
+              job: password-fix
+      ports:
+        - protocol: TCP
+          port: 5432
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# NetworkPolicy for Well-known server
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-wellknown
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: wellknown
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: wellknown
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from Traefik ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingress.traefik.namespaceSelector | nindent 14 }}
+        {{- if .Values.networkPolicy.ingress.traefik.podSelector }}
+        - podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingress.traefik.podSelector | nindent 14 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 80
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+{{- end }}

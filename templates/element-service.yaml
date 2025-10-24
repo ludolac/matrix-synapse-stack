@@ -1,0 +1,21 @@
+{{- if .Values.element.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-element
+  labels:
+    {{- include "matrix-synapse.element.labels" . | nindent 4 }}
+  {{- with .Values.element.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.element.service.type }}
+  ports:
+    - port: {{ .Values.element.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "matrix-synapse.element.selectorLabels" . | nindent 4 }}
+{{- end }}

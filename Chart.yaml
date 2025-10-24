@@ -1,0 +1,19 @@
+apiVersion: v2
+name: matrix-synapse
+description: A Helm chart for deploying Matrix Synapse with Element Web on Kubernetes
+type: application
+version: 1.2.0
+appVersion: "1.140.0"
+keywords:
+  - matrix
+  - synapse
+  - element
+  - chat
+  - messaging
+home: https://matrix.org
+sources:
+  - https://github.com/element-hq/synapse
+  - https://github.com/element-hq/element-web
+maintainers:
+  - name: WAADOO
+    email: contact@waadoo.ovh

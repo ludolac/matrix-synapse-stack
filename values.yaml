@@ -1,0 +1,511 @@
+# Default values for Matrix Synapse Helm chart
+
+# Global settings
+global:
+  environment: production
+
+# Secrets configuration
+secrets:
+  # Auto-generate secrets (NOT recommended for production)
+  # Set to false and create secrets manually using ./scripts/generate-secrets.sh
+  autoGenerate: false
+
+# Synapse image configuration
+synapse:
+  image:
+    # Using GitHub Container Registry to avoid Docker Hub rate limits
+    repository: ghcr.io/element-hq/synapse
+    tag: "v1.140.0"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  # Service account
+  serviceAccount:
+    create: true
+    annotations: {}
+    name: ""
+
+  # Pod annotations
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+
+  # Pod security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 991
+    runAsGroup: 991
+    fsGroup: 991
+    seccompProfile:
+      type: RuntimeDefault
+
+  # Container security context
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
+    runAsNonRoot: true
+    runAsUser: 991
+    runAsGroup: 991
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8008
+    federationPort: 8448
+    annotations: {}
+
+  # Resource limits and requests
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+  # Server configuration
+  server:
+    name: matrix.example.com
+    # Registration configuration
+    registration:
+      enabled: false
+      allowGuests: false
+      requireEmail: true
+
+    # Initial admin user configuration
+    # This creates an admin user during initial deployment using a Kubernetes Job
+    adminUser:
+      enabled: false
+      # Username (without @:domain, will be @username:matrix.example.com)
+      username: "admin"
+      # Password for the admin user
+      # IMPORTANT: Change this or provide via secret in production!
+      password: "ChangeMe123!"
+      # Email address (optional)
+      email: ""
+      # Make user a server admin
+      admin: true
+      # Display name (optional)
+      displayName: "Administrator"
+      # Registration shared secret (required for user creation)
+      # Generate with: openssl rand -hex 32
+      # IMPORTANT: Change this in production!
+      registrationSecret: ""
+
+    # Report stats to matrix.org
+    reportStats: false
+
+    # Media storage
+    media:
+      maxUploadSize: "50M"
+      maxImagePixels: "32M"
+
+    # URL previews
+    urlPreviews:
+      enabled: true
+
+    # Turn configuration for VoIP
+    turn:
+      enabled: false
+      uris: []
+      sharedSecret: ""
+      userLifetime: "1h"
+
+    # Email configuration
+    email:
+      enabled: false
+      smtpHost: localhost
+      smtpPort: 25
+      smtpUser: ""
+      smtpPass: ""
+      requireTransportSecurity: true
+      notifFrom: "Matrix <noreply@example.com>"
+      appName: "Matrix"
+
+    # Multi-Factor Authentication (MFA) / Two-Factor Authentication (2FA)
+    mfa:
+      # Enable TOTP (Time-based One-Time Password) - QR code authentication
+      # Note: TOTP is available by default in Synapse, users can enable it via Element Web
+      # These settings allow customization of TOTP behavior
+      totp:
+        enabled: true  # Enable TOTP support (enabled by default)
+        # TOTP algorithm (sha1, sha256, sha512)
+        algorithm: "sha1"
+        # Number of digits in TOTP code (6 or 8)
+        digits: 6
+        # Time period in seconds for TOTP code validity
+        period: 30
+        # Brand name shown in authenticator apps
+        issuer: "Matrix"
+
+      # WebAuthn/FIDO2 support (hardware security keys like YubiKey)
+      webauthn:
+        enabled: false
+        # Relying Party (RP) ID - usually your domain
+        rpId: ""  # e.g., "matrix.example.com"
+        # Relying Party name shown to users
+        rpName: "Matrix Homeserver"
+
+    # SSO (Single Sign-On) configuration
+    sso:
+      enabled: false
+
+      # OpenID Connect (OIDC) providers
+      oidc:
+        enabled: false
+        providers: []
+        # Example configurations for common providers:
+        #
+        # # Google
+        # - idp_id: google
+        #   idp_name: "Google"
+        #   idp_icon: "mxc://matrix.org/google-icon"
+        #   discover: true
+        #   issuer: "https://accounts.google.com/"
+        #   client_id: "your-client-id.apps.googleusercontent.com"
+        #   client_secret: "your-client-secret"
+        #   scopes: ["openid", "profile", "email"]
+        #   user_mapping:
+        #     localpart_template: "{{ user.email.split('@')[0] }}"
+        #     display_name_template: "{{ user.name }}"
+        #     email_template: "{{ user.email }}"
+        #
+        # # GitHub
+        # - idp_id: github
+        #   idp_name: "GitHub"
+        #   discover: false
+        #   issuer: "https://github.com/"
+        #   client_id: "your-github-client-id"
+        #   client_secret: "your-github-client-secret"
+        #   authorization_endpoint: "https://github.com/login/oauth/authorize"
+        #   token_endpoint: "https://github.com/login/oauth/access_token"
+        #   userinfo_endpoint: "https://api.github.com/user"
+        #   scopes: ["read:user", "user:email"]
+        #   user_mapping:
+        #     localpart_template: "{{ user.login }}"
+        #     display_name_template: "{{ user.name }}"
+        #     email_template: "{{ user.email }}"
+        #
+        # # Keycloak / Authentik
+        # - idp_id: keycloak
+        #   idp_name: "Corporate SSO"
+        #   discover: true
+        #   issuer: "https://sso.example.com/auth/realms/master"
+        #   client_id: "matrix"
+        #   client_secret: "your-client-secret"
+        #   scopes: ["openid", "profile", "email"]
+        #   user_mapping:
+        #     localpart_template: "{{ user.preferred_username }}"
+        #     display_name_template: "{{ user.name }}"
+        #     email_template: "{{ user.email }}"
+        #   allow_existing_users: true
+        #
+        # # Azure AD / Entra ID
+        # - idp_id: microsoft
+        #   idp_name: "Microsoft"
+        #   discover: true
+        #   issuer: "https://login.microsoftonline.com/{tenant-id}/v2.0"
+        #   client_id: "your-application-id"
+        #   client_secret: "your-client-secret"
+        #   scopes: ["openid", "profile", "email"]
+        #   user_mapping:
+        #     localpart_template: "{{ user.preferred_username.split('@')[0] }}"
+        #     display_name_template: "{{ user.name }}"
+        #     email_template: "{{ user.email }}"
+
+      # SAML2 configuration
+      saml2:
+        enabled: false
+        metadata_url: ""  # URL to IdP metadata XML
+        entity_id: ""     # Optional: SP entity ID
+        mxid_source_attribute: "uid"  # SAML attribute for username
+        mxid_mapping: "dotreplace"    # Optional: how to map username
+
+  # Database configuration
+  database:
+    external: false
+    host: postgresql.default.svc.cluster.local
+    port: 5432
+    name: synapse
+    user: synapse
+    # Password is provided via POSTGRES_PASSWORD environment variable
+    # from the matrix-synapse-postgresql secret (same secret used by PostgreSQL)
+    # Connection pool
+    cpMin: 5
+    cpMax: 10
+
+  # Signing key secret (required)
+  signingKey:
+    existingSecret: ""
+    secretKey: "signing.key"
+
+  # Persistence for media and uploads
+  persistence:
+    enabled: true
+    storageClassName: "standard"
+    accessMode: ReadWriteOnce
+    size: 10Gi
+    mountPath: /data
+
+  # Metrics
+  metrics:
+    enabled: true
+    port: 9090
+
+  # Probes
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8008
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8008
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  # Matrix Authentication Service (MAS) Integration
+  # See MAS-INTEGRATION-GUIDE.md for full implementation details
+  # This is disabled by default - enable when ready to implement MAS
+  mas:
+    enabled: false
+    # When enabled, Synapse will delegate authentication to MAS
+    # Requires MAS to be deployed separately (templates not yet included)
+    issuer: ""  # e.g., "https://auth.waadoo.ovh/"
+    accountManagementUrl: ""  # e.g., "https://auth.waadoo.ovh/account"
+    clientId: "synapse"
+    clientSecret: ""  # From Kubernetes secret
+
+  startupProbe:
+    httpGet:
+      path: /health
+      port: 8008
+    initialDelaySeconds: 0
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 30
+
+# Element Web configuration
+element:
+  enabled: true
+
+  image:
+    repository: ghcr.io/element-hq/element-web
+    tag: "v1.12.2"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 2
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+    annotations: {}
+
+  # Resource limits
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  # Element configuration
+  config:
+    defaultServerName: matrix.example.com
+    defaultServerUrl: "https://matrix.example.com"
+    brandingUrl: "https://element.io"
+    roomDirectory:
+      servers:
+        - matrix.org
+    welcomeUserId: ""
+    # Features
+    features:
+      showLabsSettings: false
+      enableWidgets: true
+    # Integration manager
+    integrations:
+      enabled: true
+      uiUrl: "https://scalar.vector.im/"
+      restUrl: "https://scalar.vector.im/api"
+      widgetsUrls:
+        - "https://scalar.vector.im/_matrix/integrations/v1"
+        - "https://scalar.vector.im/api"
+    # Branding and theming
+    branding:
+      # Custom logo URL (appears in top-left)
+      authHeaderLogoUrl: ""
+      # Welcome background image (login/register page)
+      welcomeBackgroundUrl: ""
+      # Custom CSS for additional styling
+      customCssUrl: ""
+
+  # Security context
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 101
+    runAsGroup: 101
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 101
+    fsGroup: 101
+    seccompProfile:
+      type: RuntimeDefault
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "traefik"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+    traefik.ingress.kubernetes.io/router.tls: "true"
+
+  # Synapse (Matrix homeserver)
+  synapse:
+    host: matrix.example.com
+    paths:
+      - path: /
+        pathType: Prefix
+    tls:
+      secretName: matrix-synapse-tls
+
+  # Element Web
+  element:
+    host: element.example.com
+    paths:
+      - path: /
+        pathType: Prefix
+    tls:
+      secretName: matrix-element-tls
+
+  # Federation (port 8448)
+  federation:
+    enabled: true
+    annotations:
+      traefik.ingress.kubernetes.io/router.entrypoints: "matrix-federation"
+
+# Autoscaling for Element
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Network policy
+# Creates separate NetworkPolicies for each component (Synapse, Element, PostgreSQL, Well-known)
+# with fine-grained ingress and egress rules
+networkPolicy:
+  enabled: false  # Set to true to enable NetworkPolicies
+
+  # Ingress configuration (who can access our pods)
+  ingress:
+    # Traefik ingress controller configuration
+    traefik:
+      # Namespace selector for Traefik
+      namespaceSelector:
+        name: traefik
+      # Pod selector for Traefik (optional - if not set, allows from any pod in traefik namespace)
+      podSelector: {}
+
+  # Egress configuration (what our pods can access)
+  egress:
+    # SSO provider configuration (e.g., Authelia)
+    sso:
+      # Namespace where SSO provider is running
+      namespaceSelector:
+        kubernetes.io/metadata.name: authentif
+      # Pod selector for SSO provider (optional)
+      podSelector: {}
+
+# PostgreSQL configuration
+postgresql:
+  enabled: true
+
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  database: synapse
+  username: synapse
+  # Password should be provided via secret
+  postgresPassword: ""
+
+  # Password fix job (post-install/post-upgrade hook)
+  # This job updates PostgreSQL password with the value from Kubernetes secret
+  # Generally NOT needed for fresh installs as PostgreSQL initializes with correct password
+  # Only useful for migrating from external databases or password rotation scenarios
+  passwordFixJob:
+    enabled: false  # Disabled by default (not needed for most deployments)
+
+  # Synapse-specific PostgreSQL settings
+  initdbArgs: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
+
+  # Container security context
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
+    runAsNonRoot: true
+    runAsUser: 999
+
+  # Persistence
+  persistence:
+    storageClassName: "standard"
+    size: 20Gi
+
+  # Resources
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+  # PostgreSQL configuration
+  config:
+    maxConnections: 200
+    sharedBuffers: "256MB"
+    effectiveCacheSize: "1GB"
+    maintenanceWorkMem: "64MB"
+    workMem: "8MB"
+    # Synapse requires these settings
+    walLevel: "minimal"
+    maxWalSenders: 0
+    logMinDurationStatement: 1000

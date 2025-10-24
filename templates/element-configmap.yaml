@@ -1,0 +1,61 @@
+{{- if .Values.element.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-element-config
+  labels:
+    {{- include "matrix-synapse.element.labels" . | nindent 4 }}
+data:
+  config.json: |
+    {
+      "default_server_config": {
+        "m.homeserver": {
+          "base_url": "{{ .Values.element.config.defaultServerUrl }}",
+          "server_name": "{{ .Values.element.config.defaultServerName }}"
+        },
+        "m.identity_server": {
+          "base_url": "https://vector.im"
+        }
+      },
+      "brand": "Element",
+      "integrations_ui_url": "{{ .Values.element.config.integrations.uiUrl }}",
+      "integrations_rest_url": "{{ .Values.element.config.integrations.restUrl }}",
+      "integrations_widgets_urls": {{ .Values.element.config.integrations.widgetsUrls | toJson }},
+      "integrations_jitsi_widget_url": "https://scalar.vector.im/api/widgets/jitsi.html",
+      "bug_report_endpoint_url": "https://element.io/bugreports/submit",
+      "default_country_code": "FR",
+      "show_labs_settings": {{ .Values.element.config.features.showLabsSettings }},
+      "default_federate": true,
+      "default_theme": "light",
+      "room_directory": {
+        "servers": {{ .Values.element.config.roomDirectory.servers | toJson }}
+      },
+      {{- if .Values.element.config.welcomeUserId }}
+      "welcomeUserId": "{{ .Values.element.config.welcomeUserId }}",
+      {{- end }}
+      "enable_presence_by_hs_url": {
+        "{{ .Values.element.config.defaultServerUrl }}": true
+      },
+      "setting_defaults": {
+        "breadcrumbs": true
+      },
+      "jitsi": {
+        "preferred_domain": "meet.element.io"
+      }{{- if and .Values.element.config.branding (or .Values.element.config.branding.authHeaderLogoUrl .Values.element.config.branding.welcomeBackgroundUrl) }},
+      "branding": {
+        {{- if .Values.element.config.branding.authHeaderLogoUrl }}
+        "auth_header_logo_url": "{{ .Values.element.config.branding.authHeaderLogoUrl }}"{{- if .Values.element.config.branding.welcomeBackgroundUrl }},{{- end }}
+        {{- end }}
+        {{- if .Values.element.config.branding.welcomeBackgroundUrl }}
+        "welcome_background_url": "{{ .Values.element.config.branding.welcomeBackgroundUrl }}"
+        {{- end }}
+      }{{- end }}{{- if and .Values.element.config.branding .Values.element.config.branding.customCssUrl }},
+      "custom_themes": [
+        {
+          "name": "Custom Theme",
+          "is_dark": false,
+          "colors": {}
+        }
+      ]{{- end }}
+    }
+{{- end }}

@@ -1,0 +1,197 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-synapse
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: synapse
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.synapse.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "matrix-synapse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: synapse
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/synapse-configmap.yaml") . | sha256sum }}
+        {{- with .Values.synapse.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "matrix-synapse.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: synapse
+    spec:
+      serviceAccountName: {{ include "matrix-synapse.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.synapse.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: generate-config
+          image: "{{ .Values.synapse.image.repository }}:{{ .Values.synapse.image.tag }}"
+          imagePullPolicy: {{ .Values.synapse.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              if [ ! -f /data/homeserver.yaml ]; then
+                echo "Generating initial Synapse configuration..."
+                python -m synapse.app.homeserver \
+                  --server-name={{ .Values.synapse.server.name }} \
+                  --config-path=/data/homeserver.yaml \
+                  --generate-config \
+                  --report-stats={{ .Values.synapse.server.reportStats | ternary "yes" "no" }}
+
+                # Copy signing keys if they don't exist
+                if [ ! -f /data/{{ .Values.synapse.server.name }}.signing.key ]; then
+                  cp /data/{{ .Values.synapse.server.name }}.signing.key /data/signing.key || true
+                fi
+              fi
+
+              # Process override config to substitute environment variables
+              echo "Processing configuration with environment variables..."
+              cat /config/homeserver-override.yaml | \
+                sed "s|\${POSTGRES_PASSWORD}|${POSTGRES_PASSWORD}|g" | \
+                sed "s|\${REGISTRATION_SHARED_SECRET}|${REGISTRATION_SHARED_SECRET}|g" | \
+                sed "s|\${AUTHELIA_CLIENT_SECRET}|${AUTHELIA_CLIENT_SECRET}|g" > /data/homeserver-override.yaml
+
+              echo "Configuration ready"
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "matrix-synapse.fullname" . }}-postgresql
+                  key: postgres-password
+            {{- if .Values.synapse.server.adminUser.enabled }}
+            - name: REGISTRATION_SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "matrix-synapse.fullname" . }}-admin-credentials
+                  key: registration-secret
+            {{- end }}
+            {{- if .Values.synapse.server.sso.enabled }}
+            {{- if .Values.synapse.server.sso.oidc.enabled }}
+            - name: AUTHELIA_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "matrix-synapse.fullname" . }}-sso-credentials
+                  key: authelia-client-secret
+            {{- end }}
+            {{- end }}
+          volumeMounts:
+            - name: synapse-config
+              mountPath: /config
+              readOnly: true
+            - name: synapse-data
+              mountPath: /data
+          securityContext:
+            {{- toYaml .Values.synapse.securityContext | nindent 12 }}
+      containers:
+        - name: synapse
+          securityContext:
+            {{- toYaml .Values.synapse.securityContext | nindent 12 }}
+          image: "{{ .Values.synapse.image.repository }}:{{ .Values.synapse.image.tag }}"
+          imagePullPolicy: {{ .Values.synapse.image.pullPolicy }}
+          args:
+            - "run"
+            - "-m"
+            - "synapse.app.homeserver"
+            - "-c"
+            - "/data/homeserver.yaml"
+            - "-c"
+            - "/data/homeserver-override.yaml"
+          ports:
+            - name: http
+              containerPort: 8008
+              protocol: TCP
+            - name: federation
+              containerPort: 8448
+              protocol: TCP
+            {{- if .Values.synapse.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.synapse.metrics.port }}
+              protocol: TCP
+            {{- end }}
+          env:
+            - name: SYNAPSE_SERVER_NAME
+              value: {{ .Values.synapse.server.name | quote }}
+            - name: SYNAPSE_REPORT_STATS
+              value: {{ .Values.synapse.server.reportStats | ternary "yes" "no" | quote }}
+            - name: POSTGRES_HOST
+              value: {{ include "matrix-synapse.fullname" . }}-postgresql
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: {{ .Values.postgresql.database | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.postgresql.username | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "matrix-synapse.fullname" . }}-postgresql
+                  key: postgres-password
+            {{- if .Values.synapse.server.adminUser.enabled }}
+            - name: REGISTRATION_SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "matrix-synapse.fullname" . }}-admin-credentials
+                  key: registration-secret
+            {{- end }}
+            {{- if .Values.synapse.server.sso.enabled }}
+            {{- if .Values.synapse.server.sso.oidc.enabled }}
+            - name: AUTHELIA_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "matrix-synapse.fullname" . }}-sso-credentials
+                  key: authelia-client-secret
+            {{- end }}
+            {{- end }}
+          livenessProbe:
+            {{- toYaml .Values.synapse.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.synapse.readinessProbe | nindent 12 }}
+          startupProbe:
+            {{- toYaml .Values.synapse.startupProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.synapse.resources | nindent 12 }}
+          volumeMounts:
+            - name: synapse-config
+              mountPath: /config
+              readOnly: true
+            - name: synapse-data
+              mountPath: {{ .Values.synapse.persistence.mountPath }}
+            {{- if .Values.synapse.signingKey.existingSecret }}
+            - name: signing-key
+              mountPath: /data/keys
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: synapse-config
+          configMap:
+            name: {{ include "matrix-synapse.fullname" . }}-synapse-config
+        {{- if .Values.synapse.persistence.enabled }}
+        - name: synapse-data
+          persistentVolumeClaim:
+            claimName: {{ include "matrix-synapse.fullname" . }}-synapse-pvc
+        {{- else }}
+        - name: synapse-data
+          emptyDir: {}
+        {{- end }}
+        {{- if .Values.synapse.signingKey.existingSecret }}
+        - name: signing-key
+          secret:
+            secretName: {{ .Values.synapse.signingKey.existingSecret }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

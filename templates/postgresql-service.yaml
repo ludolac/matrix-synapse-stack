@@ -1,0 +1,17 @@
+{{- if .Values.postgresql.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-postgresql
+  labels:
+    {{- include "matrix-synapse.postgresql.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgresql
+      port: 5432
+      targetPort: postgresql
+      protocol: TCP
+  selector:
+    {{- include "matrix-synapse.postgresql.selectorLabels" . | nindent 4 }}
+{{- end }}

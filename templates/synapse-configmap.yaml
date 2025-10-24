@@ -1,0 +1,262 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-synapse-config
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: synapse
+data:
+  homeserver-override.yaml: |
+    # Matrix Synapse Configuration Override
+    # This file overrides the auto-generated homeserver.yaml
+
+    server_name: "{{ .Values.synapse.server.name }}"
+
+    # Public baseurl
+    public_baseurl: "https://{{ .Values.synapse.server.name }}/"
+
+    # Listener configuration
+    listeners:
+      - port: 8008
+        tls: false
+        type: http
+        x_forwarded: true
+        bind_addresses: ['::']
+        resources:
+          - names: [client, federation]
+            compress: false
+      {{- if .Values.synapse.metrics.enabled }}
+      - port: {{ .Values.synapse.metrics.port }}
+        type: metrics
+        bind_addresses: ['::']
+      {{- end }}
+
+    # Database configuration
+    database:
+      name: psycopg2
+      args:
+        user: "{{ .Values.postgresql.username }}"
+        password: "{{ `${POSTGRES_PASSWORD}` }}"
+        database: "{{ .Values.postgresql.database }}"
+        host: "{{ include "matrix-synapse.fullname" . }}-postgresql"
+        port: 5432
+        cp_min: {{ .Values.synapse.database.cpMin }}
+        cp_max: {{ .Values.synapse.database.cpMax }}
+
+    # Registration
+    enable_registration: {{ .Values.synapse.server.registration.enabled }}
+    enable_registration_without_verification: false
+    {{- if .Values.synapse.server.registration.enabled }}
+    registrations_require_3pid:
+      {{- if .Values.synapse.server.registration.requireEmail }}
+      - email
+      {{- end }}
+    {{- end }}
+    allow_guest_access: {{ .Values.synapse.server.registration.allowGuests }}
+
+    {{- if .Values.synapse.server.adminUser.enabled }}
+    # Registration shared secret for creating admin users
+    # This is required for the register_new_matrix_user command
+    # Value is injected from REGISTRATION_SHARED_SECRET environment variable
+    registration_shared_secret: "${REGISTRATION_SHARED_SECRET}"
+    {{- end }}
+
+    # Media storage
+    max_upload_size: "{{ .Values.synapse.server.media.maxUploadSize }}"
+    max_image_pixels: "{{ .Values.synapse.server.media.maxImagePixels }}"
+    media_store_path: "{{ .Values.synapse.persistence.mountPath }}/media_store"
+
+    # URL previews
+    url_preview_enabled: {{ .Values.synapse.server.urlPreviews.enabled }}
+    {{- if .Values.synapse.server.urlPreviews.enabled }}
+    url_preview_ip_range_blacklist:
+      - '127.0.0.0/8'
+      - '10.0.0.0/8'
+      - '172.16.0.0/12'
+      - '192.168.0.0/16'
+      - '100.64.0.0/10'
+      - '169.254.0.0/16'
+      - '::1/128'
+      - 'fe80::/64'
+      - 'fc00::/7'
+    {{- end }}
+
+    # TURN server configuration
+    {{- if .Values.synapse.server.turn.enabled }}
+    turn_uris:
+      {{- range .Values.synapse.server.turn.uris }}
+      - "{{ . }}"
+      {{- end }}
+    turn_shared_secret: "{{ .Values.synapse.server.turn.sharedSecret }}"
+    turn_user_lifetime: "{{ .Values.synapse.server.turn.userLifetime }}"
+    {{- end }}
+
+    # Email configuration
+    {{- if .Values.synapse.server.email.enabled }}
+    email:
+      smtp_host: "{{ .Values.synapse.server.email.smtpHost }}"
+      smtp_port: {{ .Values.synapse.server.email.smtpPort }}
+      {{- if .Values.synapse.server.email.smtpUser }}
+      smtp_user: "{{ .Values.synapse.server.email.smtpUser }}"
+      smtp_pass: "{{ .Values.synapse.server.email.smtpPass }}"
+      {{- end }}
+      require_transport_security: {{ .Values.synapse.server.email.requireTransportSecurity }}
+      notif_from: "{{ .Values.synapse.server.email.notifFrom }}"
+      app_name: "{{ .Values.synapse.server.email.appName }}"
+    {{- end }}
+
+    # Report stats
+    report_stats: {{ .Values.synapse.server.reportStats }}
+
+    # Signing key path
+    signing_key_path: "/data/{{ .Values.synapse.server.name }}.signing.key"
+
+    # Trusted key servers
+    trusted_key_servers:
+      - server_name: "matrix.org"
+
+    # Enable metrics
+    enable_metrics: {{ .Values.synapse.metrics.enabled }}
+
+    # Suppress key server warnings
+    suppress_key_server_warning: true
+
+    {{- if .Values.synapse.server.mfa }}
+    # Multi-Factor Authentication (MFA) Configuration
+    {{- if .Values.synapse.server.mfa.totp }}
+    {{- if .Values.synapse.server.mfa.totp.enabled }}
+    # TOTP (Time-based One-Time Password) Configuration
+    # Users can enable TOTP 2FA via Element Web settings
+    ui_auth:
+      session_timeout: "900000"  # 15 minutes
+
+    # TOTP authentication settings
+    totp:
+      {{- if .Values.synapse.server.mfa.totp.algorithm }}
+      algorithm: {{ .Values.synapse.server.mfa.totp.algorithm | quote }}
+      {{- end }}
+      {{- if .Values.synapse.server.mfa.totp.digits }}
+      digits: {{ .Values.synapse.server.mfa.totp.digits }}
+      {{- end }}
+      {{- if .Values.synapse.server.mfa.totp.period }}
+      period: {{ .Values.synapse.server.mfa.totp.period }}
+      {{- end }}
+      {{- if .Values.synapse.server.mfa.totp.issuer }}
+      issuer: {{ .Values.synapse.server.mfa.totp.issuer | quote }}
+      {{- end }}
+    {{- end }}
+    {{- end }}
+
+    {{- if .Values.synapse.server.mfa.webauthn }}
+    {{- if .Values.synapse.server.mfa.webauthn.enabled }}
+    # WebAuthn/FIDO2 Configuration (hardware security keys)
+    webauthn:
+      {{- if .Values.synapse.server.mfa.webauthn.rpId }}
+      rp_id: {{ .Values.synapse.server.mfa.webauthn.rpId | quote }}
+      {{- end }}
+      {{- if .Values.synapse.server.mfa.webauthn.rpName }}
+      rp_name: {{ .Values.synapse.server.mfa.webauthn.rpName | quote }}
+      {{- end }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+
+    {{- if .Values.synapse.server.sso.enabled }}
+    # SSO Configuration
+    {{- if .Values.synapse.server.sso.oidc.enabled }}
+    # OpenID Connect (OIDC) providers
+    oidc_providers:
+      {{- range .Values.synapse.server.sso.oidc.providers }}
+      - idp_id: {{ .idp_id | quote }}
+        idp_name: {{ .idp_name | quote }}
+        {{- if .idp_icon }}
+        idp_icon: {{ .idp_icon | quote }}
+        {{- end }}
+        {{- if .idp_brand }}
+        idp_brand: {{ .idp_brand | quote }}
+        {{- end }}
+        discover: {{ .discover | default true }}
+        issuer: {{ .issuer | quote }}
+        client_id: {{ .client_id | quote }}
+        client_secret: "${AUTHELIA_CLIENT_SECRET}"
+        {{- if .client_auth_method }}
+        client_auth_method: {{ .client_auth_method | quote }}
+        {{- end }}
+        scopes: {{ .scopes | toYaml | nindent 10 }}
+        {{- if .authorization_endpoint }}
+        authorization_endpoint: {{ .authorization_endpoint | quote }}
+        {{- end }}
+        {{- if .token_endpoint }}
+        token_endpoint: {{ .token_endpoint | quote }}
+        {{- end }}
+        {{- if .userinfo_endpoint }}
+        userinfo_endpoint: {{ .userinfo_endpoint | quote }}
+        {{- end }}
+        {{- if .jwks_uri }}
+        jwks_uri: {{ .jwks_uri | quote }}
+        {{- end }}
+        user_mapping_provider:
+          config:
+            {{- if .user_mapping }}
+            {{- if .user_mapping.localpart_template }}
+            localpart_template: {{ .user_mapping.localpart_template | quote }}
+            {{- end }}
+            {{- if .user_mapping.display_name_template }}
+            display_name_template: {{ .user_mapping.display_name_template | quote }}
+            {{- end }}
+            {{- if .user_mapping.email_template }}
+            email_template: {{ .user_mapping.email_template | quote }}
+            {{- end }}
+            {{- end }}
+        {{- if .allow_existing_users }}
+        allow_existing_users: {{ .allow_existing_users }}
+        {{- end }}
+        {{- if .user_profile_method }}
+        user_profile_method: {{ .user_profile_method | quote }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+
+    {{- if .Values.synapse.server.sso.saml2.enabled }}
+    # SAML2 Configuration
+    saml2_config:
+      sp_config:
+        metadata:
+          {{- if .Values.synapse.server.sso.saml2.metadata_url }}
+          remote:
+            - url: {{ .Values.synapse.server.sso.saml2.metadata_url | quote }}
+          {{- end }}
+        {{- if .Values.synapse.server.sso.saml2.entity_id }}
+        entity_id: {{ .Values.synapse.server.sso.saml2.entity_id | quote }}
+        {{- end }}
+      user_mapping_provider:
+        config:
+          mxid_source_attribute: {{ .Values.synapse.server.sso.saml2.mxid_source_attribute | default "uid" | quote }}
+          {{- if .Values.synapse.server.sso.saml2.mxid_mapping }}
+          mxid_mapping: {{ .Values.synapse.server.sso.saml2.mxid_mapping | quote }}
+          {{- end }}
+    {{- end }}
+    {{- end }}
+
+    # Logging configuration - write to console instead of file
+    log_config: "/config/log.config.yaml"
+
+  log.config.yaml: |
+    version: 1
+    formatters:
+      precise:
+        format: '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s - %(message)s'
+    handlers:
+      console:
+        class: logging.StreamHandler
+        formatter: precise
+        stream: ext://sys.stdout
+    loggers:
+      synapse:
+        level: INFO
+      synapse.storage.SQL:
+        level: INFO
+    root:
+        level: INFO
+        handlers: [console]
+    disable_existing_loggers: false

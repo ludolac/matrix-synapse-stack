@@ -1,0 +1,16 @@
+{{- if .Values.synapse.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-synapse-pvc
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: synapse
+spec:
+  accessModes:
+    - {{ .Values.synapse.persistence.accessMode }}
+  storageClassName: {{ .Values.synapse.persistence.storageClassName }}
+  resources:
+    requests:
+      storage: {{ .Values.synapse.persistence.size }}
+{{- end }}

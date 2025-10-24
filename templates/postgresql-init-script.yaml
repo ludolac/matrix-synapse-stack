@@ -1,0 +1,23 @@
+{{- if .Values.postgresql.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-postgresql-init
+  labels:
+    {{- include "matrix-synapse.postgresql.labels" . | nindent 4 }}
+data:
+  01-create-user.sh: |
+    #!/bin/bash
+    set -e
+
+    # This script ensures the synapse user password is set correctly during PostgreSQL initialization
+    echo "Setting password for user ${POSTGRES_USER}..."
+
+    # The PostgreSQL image creates the user, we just need to ensure the password is set
+    psql -v ON_ERROR_STOP=1 --username "${POSTGRES_USER}" --dbname "${POSTGRES_DB}" -c \
+      "ALTER USER ${POSTGRES_USER} WITH PASSWORD '${POSTGRES_PASSWORD}';" 2>/dev/null || \
+    psql -v ON_ERROR_STOP=1 --username postgres --dbname template1 -c \
+      "ALTER USER ${POSTGRES_USER} WITH PASSWORD '${POSTGRES_PASSWORD}';" || true
+
+    echo "Password set for user ${POSTGRES_USER}"
+{{- end }}

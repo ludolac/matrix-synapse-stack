@@ -1,0 +1,28 @@
+# Secrets backup directory
+.secrets/
+*.txt
+*.key
+
+# Helm packaging
+*.tgz
+charts/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+
+# Backup files
+backup-*.sql
+backup-*.tar.gz
+*.sql.gpg

@@ -1,0 +1,116 @@
+{{- if .Values.synapse.server.adminUser.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-create-admin
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: admin-user-setup
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "matrix-synapse.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: admin-user-setup
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-admin
+          image: "{{ .Values.synapse.image.repository }}:{{ .Values.synapse.image.tag }}"
+          imagePullPolicy: {{ .Values.synapse.image.pullPolicy }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+
+              echo "Waiting for Synapse to be ready..."
+              for i in {1..30}; do
+                if curl -s http://{{ include "matrix-synapse.fullname" . }}-synapse:{{ .Values.synapse.service.port }}/health > /dev/null 2>&1; then
+                  echo "Synapse is ready!"
+                  break
+                fi
+                echo "Waiting for Synapse... ($i/30)"
+                sleep 5
+              done
+
+              echo "Checking if admin user already exists..."
+              # Try to login with the admin credentials
+              # If login succeeds (200), user exists and we can skip creation
+              # If login fails with M_FORBIDDEN/M_UNKNOWN, user doesn't exist or password is wrong
+              LOGIN_RESPONSE=$(curl -s -X POST \
+                http://{{ include "matrix-synapse.fullname" . }}-synapse:{{ .Values.synapse.service.port }}/_matrix/client/r0/login \
+                -H "Content-Type: application/json" \
+                -d "{\"type\":\"m.login.password\",\"user\":\"{{ .Values.synapse.server.adminUser.username }}\",\"password\":\"$ADMIN_PASSWORD\"}")
+
+              if echo "$LOGIN_RESPONSE" | grep -q "access_token"; then
+                echo "Admin user @{{ .Values.synapse.server.adminUser.username }}:{{ .Values.synapse.server.name }} already exists and credentials are valid."
+                echo "Skipping user creation."
+                exit 0
+              fi
+
+              echo "Admin user does not exist or credentials don't match. Proceeding with creation..."
+
+              echo "Creating admin user @{{ .Values.synapse.server.adminUser.username }}:{{ .Values.synapse.server.name }}..."
+
+              # Create minimal config file for register_new_matrix_user
+              echo "server_name: {{ .Values.synapse.server.name }}" > /tmp/registration.yaml
+              echo "registration_shared_secret: $REGISTRATION_SHARED_SECRET" >> /tmp/registration.yaml
+
+              echo "Sending registration request..."
+
+              # Use register_new_matrix_user command
+              /usr/local/bin/register_new_matrix_user \
+                -c /tmp/registration.yaml \
+                http://{{ include "matrix-synapse.fullname" . }}-synapse:{{ .Values.synapse.service.port }} \
+                -u {{ .Values.synapse.server.adminUser.username }} \
+                -p "$ADMIN_PASSWORD" \
+                {{- if .Values.synapse.server.adminUser.admin }}
+                --admin
+                {{- else }}
+                --no-admin
+                {{- end }}
+
+              if [ $? -eq 0 ]; then
+                echo "Success!"
+                echo "Admin user created successfully!"
+              else
+                echo "ERROR: Failed to create admin user!"
+                exit 1
+              fi
+              {{- if .Values.synapse.server.adminUser.displayName }}
+              echo "Setting display name..."
+              # Note: Setting display name requires an access token, which is complex for initial setup
+              # Users can set this via Element Web after first login
+              {{- end }}
+
+              echo "Setup complete!"
+              echo ""
+              echo "=========================================="
+              echo "Admin User Credentials:"
+              echo "Username: @{{ .Values.synapse.server.adminUser.username }}:{{ .Values.synapse.server.name }}"
+              echo "Password: [REDACTED]"
+              echo "=========================================="
+              echo ""
+              echo "IMPORTANT: Please change the admin password after first login!"
+          env:
+            - name: SYNAPSE_SERVER_NAME
+              value: {{ .Values.synapse.server.name | quote }}
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "matrix-synapse.fullname" . }}-admin-credentials
+                  key: password
+            - name: REGISTRATION_SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "matrix-synapse.fullname" . }}-admin-credentials
+                  key: registration-secret
+          securityContext:
+            {{- toYaml .Values.synapse.securityContext | nindent 12 }}
+{{- end }}

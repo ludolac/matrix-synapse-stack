@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-synapse
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: synapse
+  {{- with .Values.synapse.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.synapse.service.type }}
+  ports:
+    - port: {{ .Values.synapse.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: {{ .Values.synapse.service.federationPort }}
+      targetPort: federation
+      protocol: TCP
+      name: federation
+    {{- if .Values.synapse.metrics.enabled }}
+    - port: {{ .Values.synapse.metrics.port }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+    {{- end }}
+  selector:
+    {{- include "matrix-synapse.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: synapse
