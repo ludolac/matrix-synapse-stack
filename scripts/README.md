@@ -1,318 +1,1159 @@
 # Matrix Synapse Scripts
 
-This folder contains utility scripts for managing Matrix Synapse secrets, credentials, and users.
+Comprehensive utility scripts for managing Matrix Synapse deployment, secrets, users, backups, and SSO configuration.
+
+## 📋 Table of Contents
+
+- [Scripts Overview](#scripts-overview)
+- [Quick Start Guide](#quick-start-guide)
+- [Script Documentation](#script-documentation)
+  - [generate-secrets.sh](#generate-secretssh)
+  - [create-user.sh](#create-usersh)
+  - [backup.sh](#backupsh)
+  - [restore.sh](#restoresh)
+  - [setup-authelia-sso.sh](#setup-authelia-ssosh)
+- [Common Workflows](#common-workflows)
+- [Troubleshooting](#troubleshooting)
+- [Security Best Practices](#security-best-practices)
+
+---
 
 ## Scripts Overview
 
-- **generate-secrets.sh** - Generate and manage PostgreSQL and admin secrets
-- **create-user.sh** - Create additional Matrix users on existing deployment
+| Script | Purpose | Use Case |
+|--------|---------|----------|
+| **generate-secrets.sh** | Generate PostgreSQL & admin credentials | Initial setup, secret rotation |
+| **create-user.sh** | Create Matrix users | Add users after deployment |
+| **backup.sh** | Full backup (DB + media + keys) | Disaster recovery, migrations |
+| **restore.sh** | Restore from backup | Disaster recovery, cloning |
+| **setup-authelia-sso.sh** | Configure Authelia SSO integration | SSO/OIDC setup |
+
+---
+
+## Quick Start Guide
+
+### Initial Deployment
+
+```bash
+# 1. Generate all secrets
+./scripts/generate-secrets.sh all
+
+# 2. Deploy with Helm
+helm install matrix-synapse . -n matrix -f values-prod.yaml
+
+# 3. Create additional users
+./scripts/create-user.sh -u alice -e alice@example.com
+```
+
+### Backup & Restore
+
+```bash
+# Create backup
+./scripts/backup.sh
+
+# List backups
+ls -la .backup/
+
+# Restore from backup
+./scripts/restore.sh -b 20251024_120000
+```
+
+### SSO Configuration
+
+```bash
+# Set up Authelia OIDC integration
+./scripts/setup-authelia-sso.sh
+```
+
+---
+
+## Script Documentation
+
+## generate-secrets.sh
+
+**Generate and manage Kubernetes secrets for Matrix Synapse**
+
+### Synopsis
+
+```bash
+./scripts/generate-secrets.sh <command> [options]
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `all` | Generate both PostgreSQL and admin secrets |
+| `postgres` | Generate only PostgreSQL database password |
+| `admin` | Generate only admin user credentials |
+| `list` | List all existing Matrix Synapse secrets |
+| `verify` | Verify that all required secrets exist |
+| `export` | Export secrets to local `.secrets/` directory |
+| `delete` | Delete all Matrix Synapse secrets (requires confirmation) |
+
+### Options
+
+```bash
+-n, --namespace NAMESPACE    Kubernetes namespace (default: matrix)
+-r, --release RELEASE        Helm release name (default: matrix-synapse)
+-u, --username USERNAME      Admin username (default: admin)
+-h, --help                   Show help message
+```
+
+### Environment Variables
+
+```bash
+NAMESPACE         # Override default namespace
+RELEASE_NAME      # Override default release name
+ADMIN_USERNAME    # Custom admin username
+```
+
+### Examples
+
+**Generate all secrets:**
+```bash
+./scripts/generate-secrets.sh all
+```
+
+**Generate for custom namespace:**
+```bash
+NAMESPACE=my-matrix ./scripts/generate-secrets.sh all
+```
+
+**Generate with custom admin username:**
+```bash
+ADMIN_USERNAME=administrator ./scripts/generate-secrets.sh admin
+```
+
+**List existing secrets:**
+```bash
+./scripts/generate-secrets.sh list
+```
+
+**Verify secrets before deployment:**
+```bash
+./scripts/generate-secrets.sh verify
+```
+
+**Export secrets to files:**
+```bash
+./scripts/generate-secrets.sh export
+```
+
+### Generated Secrets
+
+#### 1. PostgreSQL Secret (`matrix-synapse-postgresql`)
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: matrix-synapse-postgresql
+data:
+  postgres-password: <base64-encoded-64-char-hex>
+```
+
+**Used by:**
+- PostgreSQL StatefulSet
+- Synapse Deployment (for database connection)
+
+#### 2. Admin Credentials Secret (`matrix-synapse-admin-credentials`)
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: matrix-synapse-admin-credentials
+data:
+  username: <base64-encoded-username>
+  password: <base64-encoded-32-char-password>
+  registration-secret: <base64-encoded-64-char-hex>
+```
+
+**Used by:**
+- Admin user creation Job
+- User management scripts
+
+### Output Files
+
+Credentials are saved to `.secrets/` (gitignored):
+
+```
+.secrets/
+├── postgresql-credentials.txt      # Database password
+├── admin-credentials.txt            # Admin username, password, reg secret
+└── users/                           # User credentials (from create-user.sh)
+    ├── alice.txt
+    └── bob.txt
+```
+
+**File permissions:** `600` (owner read/write only)
+
+### Workflow Integration
+
+```bash
+# Initial setup
+./scripts/generate-secrets.sh all
+
+# Helm chart automatically references these secrets
+helm install matrix-synapse . -n matrix -f values-prod.yaml
+
+# Admin user is created automatically by post-install job
+# using credentials from matrix-synapse-admin-credentials
+```
+
+### Secret Rotation
+
+```bash
+# 1. Backup current secrets
+./scripts/generate-secrets.sh export
+
+# 2. Generate new secrets
+./scripts/generate-secrets.sh all
+
+# 3. Upgrade deployment
+helm upgrade matrix-synapse . -n matrix -f values-prod.yaml
+
+# 4. Restart pods to use new secrets
+kubectl rollout restart deployment/matrix-synapse-synapse -n matrix
+kubectl rollout restart statefulset/matrix-synapse-postgresql -n matrix
+```
 
 ---
 
 ## create-user.sh
 
-Create additional custom Matrix users on an already deployed Synapse server.
+**Create additional Matrix users on a running Synapse deployment**
 
-### Quick Start
-
-```bash
-# Create user with auto-generated password
-./scripts/create-user.sh -u alice -e alice@example.com
-
-# Create admin user with custom password
-./scripts/create-user.sh -u bob -p MyPassword123 -e bob@example.com -a
-
-# Create user with display name
-./scripts/create-user.sh -u charlie -d "Charlie Brown" -e charlie@example.com
-```
-
-### Usage
+### Synopsis
 
 ```bash
 ./scripts/create-user.sh [options]
+```
 
-Options:
-  -u, --username USERNAME     Username (required, without @ or :domain)
-  -p, --password PASSWORD     Password (optional, auto-generated if not provided)
-  -e, --email EMAIL          Email address (optional)
-  -a, --admin                Make user a server admin (default: false)
-  -d, --display-name NAME    Display name (optional)
-  -h, --help                 Show help message
+### Options
 
-Environment Variables:
-  NAMESPACE       Kubernetes namespace (default: matrix)
-  RELEASE_NAME    Helm release name (default: matrix-synapse)
+```bash
+-u, --username USERNAME       Username (required, without @ or :domain)
+-p, --password PASSWORD       Password (optional, auto-generated if not provided)
+-e, --email EMAIL            Email address (optional)
+-a, --admin                  Make user a server admin (default: false)
+-d, --display-name NAME      Display name (optional)
+-n, --namespace NAMESPACE    Kubernetes namespace (default: matrix)
+-r, --release RELEASE        Helm release name (default: matrix-synapse)
+-h, --help                   Show help message
 ```
 
 ### Examples
 
-**Create a regular user:**
+**Create basic user:**
 ```bash
-./scripts/create-user.sh -u john -e john@waadoo.ovh
+./scripts/create-user.sh -u alice -e alice@example.com
 ```
 
-**Create an admin user:**
+**Create admin user:**
 ```bash
-./scripts/create-user.sh -u admin2 -e admin2@waadoo.ovh -a
+./scripts/create-user.sh -u admin2 -e admin2@example.com -a
 ```
 
 **Create user with custom password:**
 ```bash
-./scripts/create-user.sh -u alice -p SecurePass123! -e alice@waadoo.ovh
+./scripts/create-user.sh -u bob -p MySecurePass123! -e bob@example.com
 ```
 
 **Create user with display name:**
 ```bash
-./scripts/create-user.sh -u bob -d "Bob Smith" -e bob@waadoo.ovh
+./scripts/create-user.sh -u charlie -d "Charlie Brown" -e charlie@example.com
+```
+
+**Create for custom namespace:**
+```bash
+./scripts/create-user.sh -u alice -e alice@example.com -n my-matrix
 ```
 
 ### What It Does
 
-1. Validates the username doesn't already exist
-2. Retrieves the registration shared secret from Kubernetes
-3. Creates the user using Synapse's `register_new_matrix_user` command
-4. Saves credentials to `.secrets/users/<username>.txt`
-5. Displays the username and password
+1. **Validates** username doesn't already exist
+2. **Retrieves** registration shared secret from Kubernetes
+3. **Determines** server name from Synapse configuration
+4. **Creates** user using `register_new_matrix_user` command
+5. **Saves** credentials to `.secrets/users/<username>.txt`
+6. **Displays** credentials for immediate use
 
 ### Output
 
-When successful, the script outputs:
-
+**Success message:**
 ```
 ==========================================
   User Created Successfully!
 ==========================================
-Username: @alice:matrix.waadoo.ovh
+Username: @alice:matrix.example.com
 Password: xYz123ABC...
 Email: alice@example.com
 Admin: false
+Display Name: Alice
 ==========================================
+
+Credentials saved to: .secrets/users/alice.txt
 ```
 
-### Credential Storage
+### Credential Files
 
-User credentials are saved to:
+Each user's credentials are saved to:
 ```
 .secrets/users/<username>.txt
 ```
 
-Each file contains:
-- Username
-- Full User ID (@username:domain)
-- Password
-- Email
-- Admin status
-- Display name
-- Creation timestamp
+**File contents:**
+```
+==========================================
+  Matrix User Credentials
+==========================================
+Username: alice
+Full User ID: @alice:matrix.example.com
+Password: xYz123ABC...
+Email: alice@example.com
+Admin: false
+Display Name: Alice
+Created: 2025-10-24 12:30:45
+==========================================
+```
 
 ### Prerequisites
 
-- Matrix Synapse must be deployed and running
-- The admin credentials secret must exist (`matrix-synapse-admin-credentials`)
-- You must have kubectl access to the namespace
+- ✅ Matrix Synapse deployed and running
+- ✅ Admin credentials secret exists
+- ✅ kubectl access to namespace
+- ✅ Synapse pod is healthy
 
-### Troubleshooting
+### Common Errors
 
 **User already exists:**
 ```
-[ERROR] User @alice:matrix.waadoo.ovh already exists!
+[ERROR] User @alice:matrix.example.com already exists!
 ```
-Choose a different username or delete the existing user first.
+**Solution:** Choose different username or delete existing user first
 
-**Cannot connect to Synapse:**
+**Cannot determine server name:**
 ```
 [ERROR] Could not determine server name. Is Synapse deployed?
 ```
-Ensure the Synapse deployment is running:
-```bash
-kubectl get pods -n matrix
-```
+**Solution:** Check Synapse is running: `kubectl get pods -n matrix`
 
 **Registration secret not found:**
 ```
 [ERROR] Could not retrieve registration secret!
 ```
-Regenerate the admin credentials:
-```bash
-./scripts/generate-secrets.sh admin
+**Solution:** Regenerate admin secret: `./scripts/generate-secrets.sh admin`
+
+**Pod not ready:**
 ```
+[ERROR] Synapse pod is not ready!
+```
+**Solution:** Wait for pod to become ready: `kubectl get pods -n matrix -w`
 
 ---
 
-## generate-secrets.sh
+## backup.sh
 
-Unified script to generate and manage all Matrix Synapse secrets.
+**Complete backup of Matrix Synapse deployment**
 
-### Quick Start
-
-```bash
-# Generate all secrets (PostgreSQL + Admin user)
-./scripts/generate-secrets.sh all
-
-# Generate only PostgreSQL credentials
-./scripts/generate-secrets.sh postgres
-
-# Generate only admin user credentials
-./scripts/generate-secrets.sh admin
-
-# List all existing secrets
-./scripts/generate-secrets.sh list
-
-# Verify required secrets exist
-./scripts/generate-secrets.sh verify
-
-# Export secrets to local files
-./scripts/generate-secrets.sh export
-```
-
-### What It Creates
-
-**1. PostgreSQL Secret** (`matrix-synapse-postgresql`)
-- Contains database password
-- Used by both PostgreSQL and Synapse pods
-- Password format: 64-character hex string
-
-**2. Admin Credentials Secret** (`matrix-synapse-admin-credentials`)
-- Username (default: `admin`)
-- Password (32-character alphanumeric)
-- Registration shared secret (64-character hex)
-
-### Environment Variables
+### Synopsis
 
 ```bash
-# Use custom namespace
-NAMESPACE=my-matrix ./scripts/generate-secrets.sh all
-
-# Use custom release name
-RELEASE_NAME=my-release ./scripts/generate-secrets.sh all
-
-# Set custom admin username
-ADMIN_USERNAME=administrator ./scripts/generate-secrets.sh admin
+./scripts/backup.sh [options]
 ```
 
-### Output Files
-
-All credentials are saved to `.secrets/` directory:
-
-```
-.secrets/
-├── postgresql-credentials.txt
-└── admin-credentials.txt
-```
-
-**Security**: Files are created with `600` permissions (owner read/write only).
-
-### Complete Example
+### Options
 
 ```bash
-# Step 1: Generate all secrets
-cd /path/to/matrix-synapse-chart
-./scripts/generate-secrets.sh all
-
-# Output:
-# ==========================================
-#   Admin Credentials
-# ==========================================
-# Username: admin
-# Password: xYz123ABC...
-# Registration Secret: 7622f6271e03cbef...
-# ==========================================
-
-# Step 2: Deploy with Helm
-helm install matrix-synapse . \
-  --namespace matrix \
-  --values values-prod.yaml
-
-# Step 3: Verify secrets
-./scripts/generate-secrets.sh verify
-
-# Step 4: Access credentials later
-kubectl get secret matrix-synapse-admin-credentials -n matrix \
-  -o jsonpath='{.data.password}' | base64 -d
+-n, --namespace NAMESPACE      Kubernetes namespace (default: matrix)
+-d, --destination DIR          Backup destination directory (default: .backup)
+-c, --compress BOOL            Compress backups with gzip (default: true)
+-h, --help                     Show help message
 ```
 
-### Updating Existing Secrets
+### What Gets Backed Up
 
-The script will prompt before overwriting existing secrets:
+| Component | Location | Format | Description |
+|-----------|----------|--------|-------------|
+| **PostgreSQL Database** | `database/` | SQL dump (gzipped) | All user data, messages, room state |
+| **Media Store** | `media/` | tar.gz archive | Uploaded files, images, videos |
+| **Signing Keys** | `keys/` | Raw key file | Server cryptographic keys |
+| **Kubernetes Secrets** | `secrets/` | YAML files | Admin credentials (PostgreSQL secret excluded) |
 
+### Examples
+
+**Basic backup:**
 ```bash
-$ ./scripts/generate-secrets.sh admin
-
-[WARNING] Secret exists: matrix-synapse-admin-credentials
-Recreate? (y/N):
+./scripts/backup.sh
 ```
 
-### Deleting Secrets
-
+**Backup to custom directory:**
 ```bash
-# Delete all Matrix Synapse secrets
-./scripts/generate-secrets.sh delete
-
-# Requires confirmation by typing 'yes'
+./scripts/backup.sh -d /mnt/backups/matrix
 ```
 
-### Integration with Helm Chart
+**Backup custom namespace:**
+```bash
+./scripts/backup.sh -n my-matrix
+```
 
-The secrets created by this script are automatically used by the Helm chart:
+**Uncompressed backup:**
+```bash
+./scripts/backup.sh -c false
+```
 
-**PostgreSQL Password:**
+### Backup Structure
+
+```
+.backup/
+└── 20251024_120000/
+    ├── database/
+    │   └── synapse.sql.gz              # PostgreSQL dump
+    ├── media/
+    │   └── media-store.tar.gz          # Media files
+    ├── keys/
+    │   └── matrix.example.com.signing.key  # Signing key
+    ├── secrets/
+    │   └── admin-credentials-secret.yaml   # Admin credentials
+    └── backup-info.txt                 # Backup metadata
+```
+
+### Backup Process
+
+1. **Validate** - Check namespace and pods exist
+2. **Database** - Dump PostgreSQL using `pg_dump`
+3. **Media** - Archive media_store directory
+4. **Keys** - Copy signing key from Synapse pod
+5. **Secrets** - Export admin credentials secret
+6. **Compress** - Optionally gzip all files
+7. **Verify** - Check all backup files exist
+8. **Summary** - Display backup size and location
+
+### Output Example
+
+```
+[INFO] Starting Matrix Synapse backup...
+[INFO] Namespace: matrix
+[INFO] Backup directory: .backup/20251024_120000
+
+[INFO] Backing up PostgreSQL database...
+[SUCCESS] Database backup completed (45 MB)
+
+[INFO] Backing up media store...
+[SUCCESS] Media store backup completed (1.2 GB)
+
+[INFO] Backing up signing keys...
+[SUCCESS] Signing keys backup completed
+
+[INFO] Backing up Kubernetes secrets...
+[SUCCESS] Secrets backup completed
+
+==========================================
+  Backup Completed Successfully!
+==========================================
+Timestamp: 20251024_120000
+Location: .backup/20251024_120000
+Total Size: 1.3 GB
+Duration: 2m 15s
+
+Files:
+  - database/synapse.sql.gz (45 MB)
+  - media/media-store.tar.gz (1.2 GB)
+  - keys/.signing.key (2 KB)
+  - secrets/admin-credentials-secret.yaml (1 KB)
+==========================================
+```
+
+### Automated Backups
+
+**Using cron:**
+```bash
+# Daily backup at 2 AM
+0 2 * * * cd /path/to/chart && ./scripts/backup.sh -d /mnt/backups/matrix
+```
+
+**Using Kubernetes CronJob:**
 ```yaml
-# Referenced in synapse-deployment.yaml
-env:
-  - name: POSTGRES_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: matrix-synapse-postgresql
-        key: postgres-password
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: matrix-backup
+spec:
+  schedule: "0 2 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            image: your-backup-image
+            command: ["/scripts/backup.sh"]
 ```
 
-**Admin User:**
-```yaml
-# Referenced in admin-user-job.yaml
-# Uses registration-secret for user creation
-# Password and username from the secret
+### Important Notes
+
+- ⚠️ **PostgreSQL secret NOT included** - Uses current credentials (prevents auth failures on restore)
+- ⚠️ **Large backups** - Media store can be several GB
+- ⚠️ **Storage space** - Ensure sufficient disk space
+- ⚠️ **Retention** - Implement backup rotation policy
+
+---
+
+## restore.sh
+
+**Restore Matrix Synapse from backup**
+
+### Synopsis
+
+```bash
+./scripts/restore.sh [options]
+```
+
+### Options
+
+```bash
+-b, --backup TIMESTAMP        Backup timestamp to restore (required)
+-n, --namespace NAMESPACE     Kubernetes namespace (default: matrix)
+-d, --backup-dir DIR          Backup directory (default: .backup)
+-y, --yes                     Skip confirmation prompts
+-h, --help                    Show help message
+```
+
+### Examples
+
+**Restore specific backup:**
+```bash
+./scripts/restore.sh -b 20251024_120000
+```
+
+**Restore with auto-confirm:**
+```bash
+./scripts/restore.sh -b 20251024_120000 -y
+```
+
+**Restore from custom directory:**
+```bash
+./scripts/restore.sh -b 20251024_120000 -d /mnt/backups/matrix
+```
+
+**List available backups:**
+```bash
+ls -la .backup/
+```
+
+### Restore Process
+
+1. **Validate** - Check backup exists and is complete
+2. **Confirm** - Prompt for confirmation (unless `-y` flag)
+3. **Secrets** - Restore admin credentials (skip PostgreSQL secret)
+4. **Scale Down** - Stop Synapse to prevent conflicts
+5. **Database** - Drop and restore PostgreSQL database
+6. **Scale Up** - Start Synapse with restored data
+7. **Media** - Restore media store files
+8. **Keys** - Restore signing keys
+9. **Restart** - Restart Synapse to load changes
+10. **Verify** - Check pod status
+
+### Important Behavior
+
+**PostgreSQL Secret Handling:**
+The restore script **DOES NOT** restore the PostgreSQL secret. This is intentional to prevent authentication failures when restoring to a fresh installation with new credentials.
+
+- ✅ **Keeps** current PostgreSQL credentials
+- ✅ **Restores** database contents using new credentials
+- ✅ **Restores** admin credentials
+- ✅ **Works** with fresh Helm installations
+
+### Output Example
+
+```
+==========================================
+  Matrix Synapse Restore
+==========================================
+Backup: 20251024_120000
+Namespace: matrix
+==========================================
+
+[WARNING] This will OVERWRITE existing data!
+[WARNING] Ensure you have a recent backup.
+
+Backup contents:
+  - database/synapse.sql.gz (45 MB)
+  - media/media-store.tar.gz (1.2 GB)
+  - keys/.signing.key (2 KB)
+  - secrets/admin-credentials-secret.yaml (1 KB)
+
+Continue with restore? (yes/no): yes
+
+[INFO] Restoring Kubernetes secrets...
+[WARNING] Skipping PostgreSQL secret restore (using current credentials)
+[SUCCESS] Admin credentials restored
+
+[INFO] Scaling down Synapse...
+[SUCCESS] Synapse scaled to 0 replicas
+
+[INFO] Restoring PostgreSQL database...
+[SUCCESS] Database restored
+
+[INFO] Scaling up Synapse...
+[SUCCESS] Synapse scaled to 1 replica
+
+[INFO] Restoring media store...
+[SUCCESS] Media store restored (1.2 GB)
+
+[INFO] Restoring signing keys...
+[SUCCESS] Signing keys restored
+
+[INFO] Restarting Synapse...
+[SUCCESS] Synapse restarted
+
+==========================================
+  Restore Completed Successfully!
+==========================================
+Duration: 5m 30s
+
+Next steps:
+1. Verify Synapse is running: kubectl get pods -n matrix
+2. Check logs: kubectl logs deployment/matrix-synapse-synapse -n matrix
+3. Test login at https://element.example.com
+==========================================
+```
+
+### Common Scenarios
+
+**Disaster Recovery:**
+```bash
+# 1. Deploy fresh Helm chart
+helm install matrix-synapse . -n matrix -f values-prod.yaml
+
+# 2. Wait for pods to be ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=matrix-synapse -n matrix --timeout=300s
+
+# 3. Restore from backup
+./scripts/restore.sh -b 20251024_120000 -y
+```
+
+**Migrate to New Cluster:**
+```bash
+# 1. Backup from old cluster
+./scripts/backup.sh
+
+# 2. Copy .backup/ directory to new cluster
+
+# 3. Deploy on new cluster
+helm install matrix-synapse . -n matrix -f values-prod.yaml
+
+# 4. Restore
+./scripts/restore.sh -b 20251024_120000 -y
+```
+
+**Clone for Testing:**
+```bash
+# 1. Backup production
+./scripts/backup.sh
+
+# 2. Deploy to test namespace
+helm install matrix-synapse-test . -n matrix-test -f values-test.yaml
+
+# 3. Restore to test
+./scripts/restore.sh -b 20251024_120000 -n matrix-test -y
 ```
 
 ### Troubleshooting
 
-**Secret not found error:**
-```bash
-# Run verify to check status
-./scripts/generate-secrets.sh verify
+**Database connection errors after restore:**
+- Check PostgreSQL pod is running
+- Verify credentials match between secret and database
+- Check Synapse logs for connection errors
 
-# Regenerate missing secrets
-./scripts/generate-secrets.sh all
+**Media files not accessible:**
+- Check PVC permissions
+- Verify media store path is correct
+- Check Synapse pod has access to PVC
+
+**Signing key errors:**
+- Ensure signing key is in correct location
+- Check file permissions
+- Restart Synapse pod
+
+---
+
+## setup-authelia-sso.sh
+
+**Configure Authelia OIDC integration for Matrix Synapse**
+
+### Synopsis
+
+```bash
+./scripts/setup-authelia-sso.sh
 ```
 
-**Permission denied:**
+### What It Does
+
+1. **Generates** OIDC client secret (64-char hex)
+2. **Finds** Authelia pod in `authentif` namespace
+3. **Hashes** secret using Authelia's password utility
+4. **Displays** configuration for both Synapse and Authelia
+
+### Prerequisites
+
+- ✅ Authelia deployed and running
+- ✅ Authelia in `authentif` namespace (or modify script)
+- ✅ kubectl access to both namespaces
+
+### Output Example
+
+```
+==========================================
+  Matrix Synapse + Authelia SSO Setup
+==========================================
+
+[INFO] Step 1: Generating OIDC client secret...
+[SUCCESS] Client secret generated!
+
+  Plain Secret (for Matrix):
+  7622f6271e03cbef9d4a8b2f1e5c8a9d3f7b4e6c1a2d5f8e9c3b7a4d6f2e8c1b
+
+[INFO] Step 2: Getting Authelia pod...
+[SUCCESS] Found Authelia pod: authelia-5d7b8c9f6d-xyz12
+
+[INFO] Step 3: Hashing secret for Authelia...
+[SUCCESS] Secret hashed successfully!
+
+  Hashed Secret (for Authelia):
+  $pbkdf2-sha512$310000$...
+
+==========================================
+  Configuration Instructions
+==========================================
+
+1. UPDATE MATRIX SYNAPSE values-prod.yaml:
+
+synapse:
+  server:
+    sso:
+      enabled: true
+      oidc:
+        enabled: true
+        providers:
+          - idp_id: authelia
+            idp_name: "Authelia SSO"
+            discover: true
+            issuer: "https://auth.example.com"
+            client_id: "matrix-synapse"
+            client_secret: "7622f6271e03cbef..."
+            scopes: ["openid", "profile", "email"]
+            user_mapping:
+              localpart_template: "{{ user.preferred_username }}"
+              display_name_template: "{{ user.name }}"
+              email_template: "{{ user.email }}"
+
+2. UPDATE AUTHELIA configuration.yml:
+
+identity_providers:
+  oidc:
+    clients:
+      - id: matrix-synapse
+        description: Matrix Synapse Homeserver
+        secret: "$pbkdf2-sha512$310000$..."
+        public: false
+        authorization_policy: two_factor
+        redirect_uris:
+          - https://matrix.example.com/_synapse/client/oidc/callback
+        scopes:
+          - openid
+          - profile
+          - email
+        grant_types:
+          - authorization_code
+        response_types:
+          - code
+
+3. APPLY CHANGES:
+   - Upgrade Synapse: helm upgrade matrix-synapse . -n matrix -f values-prod.yaml
+   - Restart Authelia: kubectl rollout restart deployment/authelia -n authentif
+
+4. TEST SSO LOGIN:
+   - Visit: https://element.example.com
+   - Click "Continue with Authelia SSO"
+   - Login with Authelia credentials
+==========================================
+```
+
+### Configuration Files
+
+After running the script, you'll need to update:
+
+**1. Matrix Synapse (`values-prod.yaml`):**
+```yaml
+synapse:
+  server:
+    sso:
+      enabled: true
+      oidc:
+        enabled: true
+        providers:
+          - idp_id: authelia
+            idp_name: "Authelia SSO"
+            client_id: "matrix-synapse"
+            client_secret: "<PLAIN_SECRET>"
+            # ... other settings from output
+```
+
+**2. Authelia (`configuration.yml`):**
+```yaml
+identity_providers:
+  oidc:
+    clients:
+      - id: matrix-synapse
+        secret: "<HASHED_SECRET>"
+        # ... other settings from output
+```
+
+### Deployment
+
 ```bash
-# Make script executable
-chmod +x ./scripts/generate-secrets.sh
+# 1. Run SSO setup script
+./scripts/setup-authelia-sso.sh
+
+# 2. Update values-prod.yaml with plain secret
+
+# 3. Update Authelia configuration with hashed secret
+
+# 4. Upgrade Synapse
+helm upgrade matrix-synapse . -n matrix -f values-prod.yaml
+
+# 5. Restart Authelia
+kubectl rollout restart deployment/authelia -n authentif
+
+# 6. Test SSO login
+```
+
+### Troubleshooting
+
+**Authelia pod not found:**
+```bash
+# Check Authelia is running
+kubectl get pods -n authentif
+
+# If in different namespace, modify script
+```
+
+**SSO login fails:**
+- Check redirect URI matches exactly
+- Verify client secret matches between systems
+- Check Authelia logs: `kubectl logs deployment/authelia -n authentif`
+- Check Synapse logs: `kubectl logs deployment/matrix-synapse-synapse -n matrix`
+
+**"Invalid client" error:**
+- Verify client_id matches in both configurations
+- Check Authelia configuration is loaded
+- Restart Authelia after config changes
+
+---
+
+## Common Workflows
+
+### Initial Deployment
+
+```bash
+# 1. Generate secrets
+./scripts/generate-secrets.sh all
+
+# 2. Deploy with Helm
+helm install matrix-synapse . -n matrix -f values-prod.yaml
+
+# 3. Wait for pods
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=matrix-synapse -n matrix --timeout=300s
+
+# 4. Get admin credentials
+cat .secrets/admin-credentials.txt
+
+# 5. Create additional users
+./scripts/create-user.sh -u alice -e alice@example.com
+./scripts/create-user.sh -u bob -e bob@example.com -a
+
+# 6. Create first backup
+./scripts/backup.sh
+```
+
+### Secret Rotation
+
+```bash
+# 1. Backup current secrets
+./scripts/generate-secrets.sh export
+cp -r .secrets .secrets.backup
+
+# 2. Generate new secrets
+./scripts/generate-secrets.sh all
+
+# 3. Upgrade deployment
+helm upgrade matrix-synapse . -n matrix -f values-prod.yaml
+
+# 4. Restart services
+kubectl rollout restart deployment/matrix-synapse-synapse -n matrix
+kubectl rollout restart statefulset/matrix-synapse-postgresql -n matrix
+
+# 5. Verify
+kubectl get pods -n matrix
+```
+
+### Disaster Recovery
+
+```bash
+# 1. Deploy fresh instance
+helm install matrix-synapse . -n matrix -f values-prod.yaml
+
+# 2. Wait for ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=matrix-synapse -n matrix --timeout=300s
+
+# 3. Restore from backup
+./scripts/restore.sh -b 20251024_120000 -y
+
+# 4. Verify
+kubectl get pods -n matrix
+kubectl logs deployment/matrix-synapse-synapse -n matrix
+
+# 5. Test login
+# Visit https://element.example.com
+```
+
+### Migration to New Cluster
+
+```bash
+# OLD CLUSTER
+# 1. Create final backup
+./scripts/backup.sh
+
+# 2. Copy backup directory
+scp -r .backup/ user@new-cluster:/path/to/chart/
+
+# NEW CLUSTER
+# 3. Deploy chart
+helm install matrix-synapse . -n matrix -f values-prod.yaml
+
+# 4. Restore data
+./scripts/restore.sh -b 20251024_120000 -y
+
+# 5. Update DNS
+# Point matrix.example.com to new cluster
+
+# 6. Verify
+kubectl get pods -n matrix
+```
+
+### Setting Up SSO
+
+```bash
+# 1. Run SSO setup script
+./scripts/setup-authelia-sso.sh
+
+# 2. Copy configuration output
+
+# 3. Update values-prod.yaml
+
+# 4. Update Authelia configuration
+
+# 5. Deploy changes
+helm upgrade matrix-synapse . -n matrix -f values-prod.yaml
+kubectl rollout restart deployment/authelia -n authentif
+
+# 6. Test SSO login
+# Visit https://element.example.com
+# Click "Continue with Authelia SSO"
+```
+
+---
+
+## Troubleshooting
+
+### General Issues
+
+**Script not executable:**
+```bash
+chmod +x ./scripts/*.sh
 ```
 
 **Namespace doesn't exist:**
 ```bash
-# Script will create it automatically
-# Or create manually:
 kubectl create namespace matrix
 ```
 
-### Security Best Practices
+**kubectl not configured:**
+```bash
+kubectl config get-contexts
+kubectl config use-context <your-context>
+```
 
-1. **Backup credentials** to a secure password manager
-2. **Delete local files** after copying credentials:
-   ```bash
-   rm -rf .secrets/
-   ```
-3. **Rotate secrets** periodically:
-   ```bash
-   ./scripts/generate-secrets.sh all
-   helm upgrade matrix-synapse . --namespace matrix --values values-prod.yaml
-   ```
-4. **Use Kubernetes RBAC** to restrict secret access
-5. **Change admin password** after first login
+### Secret Issues
 
-### See Also
+**Secret already exists:**
+```
+[WARNING] Secret exists: matrix-synapse-postgresql
+Recreate? (y/N):
+```
+**Solution:** Type `y` to recreate or `N` to keep existing
 
-- [ADMIN-USER-SETUP.md](../ADMIN-USER-SETUP.md) - Admin user configuration guide
-- [README.md](../README.md) - Main chart documentation
+**Cannot create secret:**
+```
+[ERROR] Failed to create secret
+```
+**Solution:** Check RBAC permissions: `kubectl auth can-i create secrets -n matrix`
+
+### Backup Issues
+
+**Pod not found:**
+```
+[ERROR] PostgreSQL pod not found
+```
+**Solution:** Check pods are running: `kubectl get pods -n matrix`
+
+**Permission denied:**
+```
+[ERROR] Cannot create backup directory
+```
+**Solution:** Check directory permissions or specify custom destination
+
+**Backup too large:**
+```
+[ERROR] Insufficient disk space
+```
+**Solution:** Clean old backups or use external storage
+
+### Restore Issues
+
+**Database connection failed:**
+```
+[ERROR] Could not connect to database
+```
+**Solution:** Verify PostgreSQL pod is running and credentials are correct
+
+**Backup not found:**
+```
+[ERROR] Backup 20251024_120000 not found
+```
+**Solution:** List available backups: `ls -la .backup/`
+
+**Pod crash after restore:**
+```
+[ERROR] Synapse pod is crash-looping
+```
+**Solution:** Check logs: `kubectl logs deployment/matrix-synapse-synapse -n matrix`
+
+### User Creation Issues
+
+**User already exists:**
+```
+[ERROR] User @alice:matrix.example.com already exists!
+```
+**Solution:** Choose different username or delete existing user
+
+**Registration secret missing:**
+```
+[ERROR] Could not retrieve registration secret!
+```
+**Solution:** Regenerate: `./scripts/generate-secrets.sh admin`
+
+---
+
+## Security Best Practices
+
+### Secret Management
+
+✅ **DO:**
+- Store credentials in a password manager
+- Delete local `.secrets/` files after copying
+- Use unique passwords for each user
+- Rotate secrets periodically
+- Use Kubernetes RBAC to restrict secret access
+
+❌ **DON'T:**
+- Commit `.secrets/` directory to git (it's gitignored)
+- Share credentials over unencrypted channels
+- Use default passwords in production
+- Store secrets in values-prod.yaml (gitignored)
+
+### Backup Security
+
+✅ **DO:**
+- Encrypt backups before off-site storage
+- Store backups in multiple locations
+- Test restore procedures regularly
+- Implement backup retention policy
+- Monitor backup job success/failure
+
+❌ **DON'T:**
+- Store backups on the same server
+- Leave backups unencrypted
+- Skip backup verification
+- Keep infinite backups (disk space)
+
+### Access Control
+
+✅ **DO:**
+- Use admin accounts only for administration
+- Create regular users with `create-user.sh`
+- Enable 2FA/MFA for admin accounts
+- Regularly audit user accounts
+- Remove inactive users
+
+❌ **DON'T:**
+- Share admin credentials
+- Create admin users unnecessarily
+- Use predictable usernames
+- Skip access logs review
+
+### Network Security
+
+✅ **DO:**
+- Use TLS/HTTPS for all connections
+- Configure network policies
+- Use private container registries
+- Keep software updated
+- Monitor security advisories
+
+❌ **DON'T:**
+- Expose PostgreSQL externally
+- Use HTTP (unencrypted)
+- Skip certificate validation
+- Ignore security updates
+
+---
+
+## Additional Resources
+
+### Documentation
+
+- [Main Chart README](../README.md) - Comprehensive chart documentation
+- [BACKUP-RESTORE.md](BACKUP-RESTORE.md) - Detailed backup/restore guide
+- [Matrix Synapse Docs](https://element-hq.github.io/synapse/) - Official documentation
+- [Authelia Docs](https://www.authelia.com/) - SSO configuration
+
+### Support
+
+For issues or questions:
+
+1. Check this README and troubleshooting section
+2. Review logs: `kubectl logs -n matrix -l app.kubernetes.io/instance=matrix-synapse`
+3. Check Matrix community: #synapse:matrix.org
+4. Open issue: https://github.com/ludolac/matrix-synapse-stack/issues
+
+---
+
+## Script Compatibility
+
+| Script | Kubernetes | Helm | kubectl | jq |
+|--------|------------|------|---------|-----|
+| generate-secrets.sh | 1.24+ | 3.8+ | ✅ | ❌ |
+| create-user.sh | 1.24+ | 3.8+ | ✅ | ❌ |
+| backup.sh | 1.24+ | - | ✅ | ❌ |
+| restore.sh | 1.24+ | - | ✅ | ❌ |
+| setup-authelia-sso.sh | 1.24+ | - | ✅ | ❌ |
+
+---
+
+**Last Updated:** 2025-10-24
+**Chart Version:** 1.2.x
+**License:** MIT
