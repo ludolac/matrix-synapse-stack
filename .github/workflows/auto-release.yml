@@ -78,6 +78,35 @@ jobs:
       - name: Package Helm chart
         run: |
           helm package .
+          mkdir -p /tmp/helm-charts
+          cp *.tgz /tmp/helm-charts/
+
+      - name: Publish to gh-pages
+        run: |
+          # Checkout gh-pages branch
+          if git fetch origin gh-pages 2>/dev/null; then
+            git checkout gh-pages
+          else
+            git checkout --orphan gh-pages
+            git rm -rf . || true
+            git clean -fxd
+          fi
+
+          # Copy package and update index
+          cp /tmp/helm-charts/*.tgz . || true
+          helm repo index . --url https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+          git add -f *.tgz index.yaml
+
+          # Commit and push
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Publish Helm chart v${{ steps.bump_version.outputs.new_version }}"
+            git push origin gh-pages || git push --set-upstream origin gh-pages
+          fi
+
+          # Return to main branch
+          git checkout main
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
