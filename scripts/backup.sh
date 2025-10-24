@@ -106,12 +106,14 @@ log_success "Found Synapse pod: ${SYNAPSE_POD}"
 
 # 1. Backup PostgreSQL Database
 log_info "Backing up PostgreSQL database..."
-DB_NAME=$(kubectl get secret -n "${NAMESPACE}" matrix-synapse-postgresql -o jsonpath='{.data.database}' 2>/dev/null | base64 -d || echo "synapse")
-DB_USER=$(kubectl get secret -n "${NAMESPACE}" matrix-synapse-postgresql -o jsonpath='{.data.username}' 2>/dev/null | base64 -d || echo "synapse")
-DB_PASSWORD=$(kubectl get secret -n "${NAMESPACE}" matrix-synapse-postgresql -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "")
 
+# Get database credentials (use trust auth on localhost - no password needed)
+DB_NAME="synapse_prod"  # Default database name for this chart
+DB_USER="synapse"  # Database user
+
+# Backup database using trust authentication on localhost
 kubectl exec "${POSTGRES_POD}" -n "${NAMESPACE}" -- \
-    env PGPASSWORD="${DB_PASSWORD}" pg_dump -U "${DB_USER}" "${DB_NAME}" > "${BACKUP_PATH}/database/synapse.sql"
+    pg_dump -h 127.0.0.1 -U "${DB_USER}" "${DB_NAME}" > "${BACKUP_PATH}/database/synapse.sql"
 
 if [ "$COMPRESS" = true ]; then
     log_info "Compressing database backup..."

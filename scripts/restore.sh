@@ -153,9 +153,9 @@ fi
 log_success "Found PostgreSQL pod: ${POSTGRES_POD}"
 log_success "Found Synapse pod: ${SYNAPSE_POD}"
 
-# Get database credentials
-DB_NAME=$(kubectl get secret -n "${NAMESPACE}" matrix-synapse-postgresql -o jsonpath='{.data.database}' 2>/dev/null | base64 -d || echo "synapse")
-DB_USER=$(kubectl get secret -n "${NAMESPACE}" matrix-synapse-postgresql -o jsonpath='{.data.username}' 2>/dev/null | base64 -d || echo "synapse")
+# Get database credentials (use trust auth on localhost - no password needed)
+DB_NAME="synapse_prod"  # Default database name for this chart
+DB_USER="synapse"  # Database user
 
 log_info "Database: ${DB_NAME}, User: ${DB_USER}"
 
@@ -202,20 +202,17 @@ else
     kubectl cp "${DB_BACKUP}" "${NAMESPACE}/${POSTGRES_POD}:/tmp/synapse-backup.sql"
 fi
 
-# Get database password
-DB_PASSWORD=$(kubectl get secret -n "${NAMESPACE}" matrix-synapse-postgresql -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "")
-
-# Drop and recreate database
+# Drop and recreate database using trust authentication
 log_info "Dropping and recreating database..."
 kubectl exec "${POSTGRES_POD}" -n "${NAMESPACE}" -- \
-    env PGPASSWORD="${DB_PASSWORD}" psql -U "${DB_USER}" postgres -c "DROP DATABASE IF EXISTS ${DB_NAME};"
+    psql -h 127.0.0.1 -U "${DB_USER}" postgres -c "DROP DATABASE IF EXISTS ${DB_NAME};"
 kubectl exec "${POSTGRES_POD}" -n "${NAMESPACE}" -- \
-    env PGPASSWORD="${DB_PASSWORD}" psql -U "${DB_USER}" postgres -c "CREATE DATABASE ${DB_NAME};"
+    psql -h 127.0.0.1 -U "${DB_USER}" postgres -c "CREATE DATABASE ${DB_NAME};"
 
 # Restore database
 log_info "Restoring database (this may take a while)..."
 kubectl exec "${POSTGRES_POD}" -n "${NAMESPACE}" -- \
-    env PGPASSWORD="${DB_PASSWORD}" psql -U "${DB_USER}" "${DB_NAME}" -f /tmp/synapse-backup.sql
+    psql -h 127.0.0.1 -U "${DB_USER}" "${DB_NAME}" -f /tmp/synapse-backup.sql
 
 # Cleanup
 kubectl exec "${POSTGRES_POD}" -n "${NAMESPACE}" -- rm /tmp/synapse-backup.sql
