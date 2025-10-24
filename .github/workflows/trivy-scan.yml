@@ -127,11 +127,34 @@ jobs:
           output: 'trivy-${{ matrix.image.name }}.json'
           severity: 'CRITICAL,HIGH,MEDIUM,LOW'
 
-      - name: Upload image scan results
+      - name: Generate CSV report for ${{ matrix.image.name }}
+        run: |
+          # Convert JSON to CSV with detailed vulnerability information
+          jq -r '
+            ["CVE ID", "Severity", "Package", "Installed Version", "Fixed Version", "Title", "Description"] as $headers |
+            $headers,
+            (
+              .Results[]?.Vulnerabilities[]? |
+              [
+                .VulnerabilityID // "N/A",
+                .Severity // "UNKNOWN",
+                .PkgName // "N/A",
+                .InstalledVersion // "N/A",
+                .FixedVersion // "Not Fixed",
+                .Title // "No title",
+                (.Description // "No description" | gsub("\n"; " ") | .[0:200])
+              ]
+            ) |
+            @csv
+          ' trivy-${{ matrix.image.name }}.json > trivy-${{ matrix.image.name }}.csv || echo "No vulnerabilities found" > trivy-${{ matrix.image.name }}.csv
+
+      - name: Upload image scan results (JSON + CSV)
         uses: actions/upload-artifact@v4
         with:
-          name: trivy-${{ matrix.image.name }}-json
-          path: 'trivy-${{ matrix.image.name }}.json'
+          name: trivy-${{ matrix.image.name }}-reports
+          path: |
+            trivy-${{ matrix.image.name }}.json
+            trivy-${{ matrix.image.name }}.csv
 
   security-summary:
     runs-on: ubuntu-latest
@@ -156,6 +179,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: image-scans
+          pattern: trivy-*-reports
 
       - name: Generate security badge
         id: badge
@@ -172,7 +196,7 @@ jobs:
           IMAGE_MEDIUM=0
           IMAGE_LOW=0
 
-          for file in image-scans/trivy-*-json/*.json; do
+          for file in image-scans/trivy-*-reports/*.json; do
             if [ -f "$file" ]; then
               CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' "$file" 2>/dev/null || echo 0)
               HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' "$file" 2>/dev/null || echo 0)
@@ -229,34 +253,56 @@ jobs:
         id: image-details
         run: |
           # Initialize markdown table for image details
-          IMAGE_TABLE="| Image | Critical | High | Medium | Low |\n"
-          IMAGE_TABLE="${IMAGE_TABLE}|-------|----------|------|--------|-----|\n"
+          IMAGE_TABLE="| Image | Version | Critical | High | Medium | Low |\n"
+          IMAGE_TABLE="${IMAGE_TABLE}|-------|---------|----------|------|--------|-----|\n"
+
+          # Get workflow run ID for artifact links
+          RUN_ID="${{ github.run_id }}"
+          REPO="${{ github.repository }}"
 
           # Process synapse image
-          if [ -f "image-scans/trivy-synapse-json/trivy-synapse.json" ]; then
-            CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' image-scans/trivy-synapse-json/trivy-synapse.json 2>/dev/null || echo 0)
-            HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' image-scans/trivy-synapse-json/trivy-synapse.json 2>/dev/null || echo 0)
-            MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' image-scans/trivy-synapse-json/trivy-synapse.json 2>/dev/null || echo 0)
-            LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' image-scans/trivy-synapse-json/trivy-synapse.json 2>/dev/null || echo 0)
-            IMAGE_TABLE="${IMAGE_TABLE}| **Synapse (v1.140.0)** | $CRIT | $HIGH | $MED | $LOW |\n"
+          if [ -f "image-scans/trivy-synapse-reports/trivy-synapse.json" ]; then
+            CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' image-scans/trivy-synapse-reports/trivy-synapse.json 2>/dev/null || echo 0)
+            HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' image-scans/trivy-synapse-reports/trivy-synapse.json 2>/dev/null || echo 0)
+            MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' image-scans/trivy-synapse-reports/trivy-synapse.json 2>/dev/null || echo 0)
+            LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' image-scans/trivy-synapse-reports/trivy-synapse.json 2>/dev/null || echo 0)
+
+            CRIT_BADGE="[![Critical](https://img.shields.io/badge/critical-${CRIT}-$([ ${CRIT} -eq 0 ] && echo 'success' || echo 'critical'))](https://github.com/${REPO}/actions/runs/${RUN_ID})"
+            HIGH_BADGE="[![High](https://img.shields.io/badge/high-${HIGH}-$([ ${HIGH} -eq 0 ] && echo 'success' || echo 'important'))](https://github.com/${REPO}/actions/runs/${RUN_ID})"
+            MED_BADGE="[![Medium](https://img.shields.io/badge/medium-${MED}-$([ ${MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID})"
+            LOW_BADGE="[![Low](https://img.shields.io/badge/low-${LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID})"
+
+            IMAGE_TABLE="${IMAGE_TABLE}| **Synapse** | v1.140.0 | ${CRIT_BADGE} | ${HIGH_BADGE} | ${MED_BADGE} | ${LOW_BADGE} |\n"
           fi
 
           # Process element-web image
-          if [ -f "image-scans/trivy-element-web-json/trivy-element-web.json" ]; then
-            CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' image-scans/trivy-element-web-json/trivy-element-web.json 2>/dev/null || echo 0)
-            HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' image-scans/trivy-element-web-json/trivy-element-web.json 2>/dev/null || echo 0)
-            MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' image-scans/trivy-element-web-json/trivy-element-web.json 2>/dev/null || echo 0)
-            LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' image-scans/trivy-element-web-json/trivy-element-web.json 2>/dev/null || echo 0)
-            IMAGE_TABLE="${IMAGE_TABLE}| **Element Web (v1.12.2)** | $CRIT | $HIGH | $MED | $LOW |\n"
+          if [ -f "image-scans/trivy-element-web-reports/trivy-element-web.json" ]; then
+            CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' image-scans/trivy-element-web-reports/trivy-element-web.json 2>/dev/null || echo 0)
+            HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' image-scans/trivy-element-web-reports/trivy-element-web.json 2>/dev/null || echo 0)
+            MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' image-scans/trivy-element-web-reports/trivy-element-web.json 2>/dev/null || echo 0)
+            LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' image-scans/trivy-element-web-reports/trivy-element-web.json 2>/dev/null || echo 0)
+
+            CRIT_BADGE="[![Critical](https://img.shields.io/badge/critical-${CRIT}-$([ ${CRIT} -eq 0 ] && echo 'success' || echo 'critical'))](https://github.com/${REPO}/actions/runs/${RUN_ID})"
+            HIGH_BADGE="[![High](https://img.shields.io/badge/high-${HIGH}-$([ ${HIGH} -eq 0 ] && echo 'success' || echo 'important'))](https://github.com/${REPO}/actions/runs/${RUN_ID})"
+            MED_BADGE="[![Medium](https://img.shields.io/badge/medium-${MED}-$([ ${MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID})"
+            LOW_BADGE="[![Low](https://img.shields.io/badge/low-${LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID})"
+
+            IMAGE_TABLE="${IMAGE_TABLE}| **Element Web** | v1.12.2 | ${CRIT_BADGE} | ${HIGH_BADGE} | ${MED_BADGE} | ${LOW_BADGE} |\n"
           fi
 
           # Process postgresql image
-          if [ -f "image-scans/trivy-postgresql-json/trivy-postgresql.json" ]; then
-            CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' image-scans/trivy-postgresql-json/trivy-postgresql.json 2>/dev/null || echo 0)
-            HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' image-scans/trivy-postgresql-json/trivy-postgresql.json 2>/dev/null || echo 0)
-            MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' image-scans/trivy-postgresql-json/trivy-postgresql.json 2>/dev/null || echo 0)
-            LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' image-scans/trivy-postgresql-json/trivy-postgresql.json 2>/dev/null || echo 0)
-            IMAGE_TABLE="${IMAGE_TABLE}| **PostgreSQL (16-alpine)** | $CRIT | $HIGH | $MED | $LOW |\n"
+          if [ -f "image-scans/trivy-postgresql-reports/trivy-postgresql.json" ]; then
+            CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' image-scans/trivy-postgresql-reports/trivy-postgresql.json 2>/dev/null || echo 0)
+            HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' image-scans/trivy-postgresql-reports/trivy-postgresql.json 2>/dev/null || echo 0)
+            MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' image-scans/trivy-postgresql-reports/trivy-postgresql.json 2>/dev/null || echo 0)
+            LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' image-scans/trivy-postgresql-reports/trivy-postgresql.json 2>/dev/null || echo 0)
+
+            CRIT_BADGE="[![Critical](https://img.shields.io/badge/critical-${CRIT}-$([ ${CRIT} -eq 0 ] && echo 'success' || echo 'critical'))](https://github.com/${REPO}/actions/runs/${RUN_ID})"
+            HIGH_BADGE="[![High](https://img.shields.io/badge/high-${HIGH}-$([ ${HIGH} -eq 0 ] && echo 'success' || echo 'important'))](https://github.com/${REPO}/actions/runs/${RUN_ID})"
+            MED_BADGE="[![Medium](https://img.shields.io/badge/medium-${MED}-$([ ${MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID})"
+            LOW_BADGE="[![Low](https://img.shields.io/badge/low-${LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID})"
+
+            IMAGE_TABLE="${IMAGE_TABLE}| **PostgreSQL** | 16-alpine | ${CRIT_BADGE} | ${HIGH_BADGE} | ${MED_BADGE} | ${LOW_BADGE} |\n"
           fi
 
           echo "image_table<<EOF" >> $GITHUB_OUTPUT
@@ -319,33 +365,37 @@ jobs:
           IMAGE_MED_BADGE="![Medium](https://img.shields.io/badge/medium-${{ steps.badge.outputs.image_medium }}-$([ ${{ steps.badge.outputs.image_medium }} -eq 0 ] && echo 'success' || echo 'orange'))"
           IMAGE_LOW_BADGE="![Low](https://img.shields.io/badge/low-${{ steps.badge.outputs.image_low }}-informational)"
 
+          # Get workflow run ID and repository for links
+          RUN_ID="${{ github.run_id }}"
+          REPO="${{ github.repository }}"
+
           # Extract per-image counts
-          SYNAPSE_CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' image-scans/trivy-synapse-json/trivy-synapse.json 2>/dev/null || echo 0)
-          SYNAPSE_HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' image-scans/trivy-synapse-json/trivy-synapse.json 2>/dev/null || echo 0)
-          SYNAPSE_MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' image-scans/trivy-synapse-json/trivy-synapse.json 2>/dev/null || echo 0)
-          SYNAPSE_LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' image-scans/trivy-synapse-json/trivy-synapse.json 2>/dev/null || echo 0)
+          SYNAPSE_CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' image-scans/trivy-synapse-reports/trivy-synapse.json 2>/dev/null || echo 0)
+          SYNAPSE_HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' image-scans/trivy-synapse-reports/trivy-synapse.json 2>/dev/null || echo 0)
+          SYNAPSE_MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' image-scans/trivy-synapse-reports/trivy-synapse.json 2>/dev/null || echo 0)
+          SYNAPSE_LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' image-scans/trivy-synapse-reports/trivy-synapse.json 2>/dev/null || echo 0)
 
-          ELEMENT_CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' image-scans/trivy-element-web-json/trivy-element-web.json 2>/dev/null || echo 0)
-          ELEMENT_HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' image-scans/trivy-element-web-json/trivy-element-web.json 2>/dev/null || echo 0)
-          ELEMENT_MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' image-scans/trivy-element-web-json/trivy-element-web.json 2>/dev/null || echo 0)
-          ELEMENT_LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' image-scans/trivy-element-web-json/trivy-element-web.json 2>/dev/null || echo 0)
+          ELEMENT_CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' image-scans/trivy-element-web-reports/trivy-element-web.json 2>/dev/null || echo 0)
+          ELEMENT_HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' image-scans/trivy-element-web-reports/trivy-element-web.json 2>/dev/null || echo 0)
+          ELEMENT_MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' image-scans/trivy-element-web-reports/trivy-element-web.json 2>/dev/null || echo 0)
+          ELEMENT_LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' image-scans/trivy-element-web-reports/trivy-element-web.json 2>/dev/null || echo 0)
 
-          POSTGRES_CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' image-scans/trivy-postgresql-json/trivy-postgresql.json 2>/dev/null || echo 0)
-          POSTGRES_HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' image-scans/trivy-postgresql-json/trivy-postgresql.json 2>/dev/null || echo 0)
-          POSTGRES_MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' image-scans/trivy-postgresql-json/trivy-postgresql.json 2>/dev/null || echo 0)
-          POSTGRES_LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' image-scans/trivy-postgresql-json/trivy-postgresql.json 2>/dev/null || echo 0)
+          POSTGRES_CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' image-scans/trivy-postgresql-reports/trivy-postgresql.json 2>/dev/null || echo 0)
+          POSTGRES_HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' image-scans/trivy-postgresql-reports/trivy-postgresql.json 2>/dev/null || echo 0)
+          POSTGRES_MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' image-scans/trivy-postgresql-reports/trivy-postgresql.json 2>/dev/null || echo 0)
+          POSTGRES_LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' image-scans/trivy-postgresql-reports/trivy-postgresql.json 2>/dev/null || echo 0)
 
           # Update README with sed (replace the Overall Security Status table)
           sed -i "/^| \*\*Configuration\*\* |/c\| **Configuration** | ![Status](https://img.shields.io/badge/status-scanned-success) | Daily at 2AM UTC | $CONFIG_CRIT_BADGE | $CONFIG_HIGH_BADGE | $CONFIG_MED_BADGE | $CONFIG_LOW_BADGE |" README.md
           sed -i "/^| \*\*Helm Manifests\*\* |/c\| **Helm Manifests** | ![Status](https://img.shields.io/badge/status-scanned-success) | On every push | $CONFIG_CRIT_BADGE | $CONFIG_HIGH_BADGE | $CONFIG_MED_BADGE | $CONFIG_LOW_BADGE |" README.md
           sed -i "/^| \*\*Container Images\*\* |/c\| **Container Images** | ![Status](https://img.shields.io/badge/status-scanned-success) | Daily + On Push | $IMAGE_CRIT_BADGE | $IMAGE_HIGH_BADGE | $IMAGE_MED_BADGE | $IMAGE_LOW_BADGE |" README.md
 
-          # Update per-image table
-          sed -i "/^| \*\*Synapse\*\* | v1.140.0 |/c\| **Synapse** | v1.140.0 | ![Critical](https://img.shields.io/badge/critical-${SYNAPSE_CRIT}-$([ ${SYNAPSE_CRIT} -eq 0 ] && echo 'success' || echo 'critical')) | ![High](https://img.shields.io/badge/high-${SYNAPSE_HIGH}-$([ ${SYNAPSE_HIGH} -eq 0 ] && echo 'success' || echo 'important')) | ![Medium](https://img.shields.io/badge/medium-${SYNAPSE_MED}-$([ ${SYNAPSE_MED} -eq 0 ] && echo 'success' || echo 'orange')) | ![Low](https://img.shields.io/badge/low-${SYNAPSE_LOW}-informational) |" README.md
+          # Update per-image table with clickable badges
+          sed -i "/^| \*\*Synapse\*\* | v1.140.0 |/c\| **Synapse** | v1.140.0 | [![Critical](https://img.shields.io/badge/critical-${SYNAPSE_CRIT}-$([ ${SYNAPSE_CRIT} -eq 0 ] && echo 'success' || echo 'critical'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![High](https://img.shields.io/badge/high-${SYNAPSE_HIGH}-$([ ${SYNAPSE_HIGH} -eq 0 ] && echo 'success' || echo 'important'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Medium](https://img.shields.io/badge/medium-${SYNAPSE_MED}-$([ ${SYNAPSE_MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Low](https://img.shields.io/badge/low-${SYNAPSE_LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID}) |" README.md
 
-          sed -i "/^| \*\*Element Web\*\* | v1.12.2 |/c\| **Element Web** | v1.12.2 | ![Critical](https://img.shields.io/badge/critical-${ELEMENT_CRIT}-$([ ${ELEMENT_CRIT} -eq 0 ] && echo 'success' || echo 'critical')) | ![High](https://img.shields.io/badge/high-${ELEMENT_HIGH}-$([ ${ELEMENT_HIGH} -eq 0 ] && echo 'success' || echo 'important')) | ![Medium](https://img.shields.io/badge/medium-${ELEMENT_MED}-$([ ${ELEMENT_MED} -eq 0 ] && echo 'success' || echo 'orange')) | ![Low](https://img.shields.io/badge/low-${ELEMENT_LOW}-informational) |" README.md
+          sed -i "/^| \*\*Element Web\*\* | v1.12.2 |/c\| **Element Web** | v1.12.2 | [![Critical](https://img.shields.io/badge/critical-${ELEMENT_CRIT}-$([ ${ELEMENT_CRIT} -eq 0 ] && echo 'success' || echo 'critical'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![High](https://img.shields.io/badge/high-${ELEMENT_HIGH}-$([ ${ELEMENT_HIGH} -eq 0 ] && echo 'success' || echo 'important'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Medium](https://img.shields.io/badge/medium-${ELEMENT_MED}-$([ ${ELEMENT_MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Low](https://img.shields.io/badge/low-${ELEMENT_LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID}) |" README.md
 
-          sed -i "/^| \*\*PostgreSQL\*\* | 16-alpine |/c\| **PostgreSQL** | 16-alpine | ![Critical](https://img.shields.io/badge/critical-${POSTGRES_CRIT}-$([ ${POSTGRES_CRIT} -eq 0 ] && echo 'success' || echo 'critical')) | ![High](https://img.shields.io/badge/high-${POSTGRES_HIGH}-$([ ${POSTGRES_HIGH} -eq 0 ] && echo 'success' || echo 'important')) | ![Medium](https://img.shields.io/badge/medium-${POSTGRES_MED}-$([ ${POSTGRES_MED} -eq 0 ] && echo 'success' || echo 'orange')) | ![Low](https://img.shields.io/badge/low-${POSTGRES_LOW}-informational) |" README.md
+          sed -i "/^| \*\*PostgreSQL\*\* | 16-alpine |/c\| **PostgreSQL** | 16-alpine | [![Critical](https://img.shields.io/badge/critical-${POSTGRES_CRIT}-$([ ${POSTGRES_CRIT} -eq 0 ] && echo 'success' || echo 'critical'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![High](https://img.shields.io/badge/high-${POSTGRES_HIGH}-$([ ${POSTGRES_HIGH} -eq 0 ] && echo 'success' || echo 'important'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Medium](https://img.shields.io/badge/medium-${POSTGRES_MED}-$([ ${POSTGRES_MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Low](https://img.shields.io/badge/low-${POSTGRES_LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID}) |" README.md
 
           # Show diff
           echo "README changes:"

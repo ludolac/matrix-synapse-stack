@@ -51,9 +51,9 @@ Production-ready Helm chart for deploying Matrix Synapse homeserver with Element
 - **Latest Scan**: [GitHub Actions Workflow](https://github.com/ludolac/matrix-synapse-stack/actions/workflows/trivy-scan.yml)
 - **Security Findings**: [Code Scanning Alerts](https://github.com/ludolac/matrix-synapse-stack/security/code-scanning)
 - **Historical Scans**: [All Workflow Runs](https://github.com/ludolac/matrix-synapse-stack/actions/workflows/trivy-scan.yml)
-- **Scan Artifacts**: Download detailed JSON reports from workflow runs
+- **Download Reports**: Click any vulnerability badge to view the scan run and download detailed CSV/JSON reports
 
-> **Note**: Vulnerability counts are updated automatically after each scan. Click the badges above for real-time status. Container image scans check for vulnerabilities in base OS packages and application dependencies.
+> **Note**: Vulnerability counts are updated automatically after each scan. **Click any badge** in the Container Images table to see the full scan run with downloadable CSV reports containing CVE IDs, affected packages, versions, and descriptions. Container image scans check for vulnerabilities in base OS packages and application dependencies.
 
 ---
 
