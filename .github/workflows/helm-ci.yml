@@ -60,6 +60,8 @@ jobs:
       - name: Package Helm chart
         run: |
           helm package .
+          mkdir -p /tmp/helm-charts
+          cp *.tgz /tmp/helm-charts/
 
       - name: Clone gh-pages or create new
         run: |
@@ -73,7 +75,7 @@ jobs:
 
       - name: Copy package and update index
         run: |
-          git checkout main -- *.tgz 2>/dev/null || true
+          cp /tmp/helm-charts/*.tgz . || true
           helm repo index . --url https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
           git add -f *.tgz index.yaml
 
