@@ -4,8 +4,10 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ include "matrix-synapse.fullname" . }}-synapse-pvc
   labels:
-    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    # Using selectorLabels to avoid immutability issues when chart version changes
+    {{- include "matrix-synapse.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: synapse
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
   accessModes:
     - {{ .Values.synapse.persistence.accessMode }}

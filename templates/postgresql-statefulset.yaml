@@ -92,7 +92,10 @@ spec:
     - metadata:
         name: postgresql-data
         labels:
-          {{- include "matrix-synapse.postgresql.labels" . | nindent 10 }}
+          # Using selectorLabels instead of full labels to avoid immutability issues
+          # when chart version changes (helm.sh/chart label causes StatefulSet updates to fail)
+          {{- include "matrix-synapse.postgresql.selectorLabels" . | nindent 10 }}
+          app.kubernetes.io/managed-by: {{ .Release.Service }}
       spec:
         accessModes:
           - ReadWriteOnce
