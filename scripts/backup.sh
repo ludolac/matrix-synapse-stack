@@ -111,7 +111,7 @@ DB_USER=$(kubectl get secret -n "${NAMESPACE}" matrix-synapse-postgresql -o json
 DB_PASSWORD=$(kubectl get secret -n "${NAMESPACE}" matrix-synapse-postgresql -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "")
 
 kubectl exec "${POSTGRES_POD}" -n "${NAMESPACE}" -- \
-    sh -c "export PGPASSWORD='${DB_PASSWORD}' && pg_dump -U ${DB_USER} ${DB_NAME}" > "${BACKUP_PATH}/database/synapse.sql"
+    env PGPASSWORD="${DB_PASSWORD}" pg_dump -U "${DB_USER}" "${DB_NAME}" > "${BACKUP_PATH}/database/synapse.sql"
 
 if [ "$COMPRESS" = true ]; then
     log_info "Compressing database backup..."
