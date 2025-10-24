@@ -12,6 +12,9 @@
 *.tgz
 charts/
 
+# Production values (contains sensitive config)
+values-prod.yaml
+
 # Temporary files
 *.tmp
 *.bak
