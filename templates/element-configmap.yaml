@@ -41,6 +41,12 @@ data:
       },
       "jitsi": {
         "preferred_domain": "meet.element.io"
+      },
+      "element_call": {
+        "url": "https://call.element.io",
+        "use_exclusively": false,
+        "participant_limit": 8,
+        "brand": "Element Call"
       }{{- if and .Values.element.config.branding (or .Values.element.config.branding.authHeaderLogoUrl .Values.element.config.branding.welcomeBackgroundUrl) }},
       "branding": {
         {{- if .Values.element.config.branding.authHeaderLogoUrl }}
