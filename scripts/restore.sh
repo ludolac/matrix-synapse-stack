@@ -202,14 +202,20 @@ else
     kubectl cp "${DB_BACKUP}" "${NAMESPACE}/${POSTGRES_POD}:/tmp/synapse-backup.sql"
 fi
 
+# Get database password
+DB_PASSWORD=$(kubectl get secret -n "${NAMESPACE}" matrix-synapse-postgresql -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || echo "")
+
 # Drop and recreate database
 log_info "Dropping and recreating database..."
-kubectl exec "${POSTGRES_POD}" -n "${NAMESPACE}" -- psql -U "${DB_USER}" -d postgres -c "DROP DATABASE IF EXISTS ${DB_NAME};"
-kubectl exec "${POSTGRES_POD}" -n "${NAMESPACE}" -- psql -U "${DB_USER}" -d postgres -c "CREATE DATABASE ${DB_NAME};"
+kubectl exec "${POSTGRES_POD}" -n "${NAMESPACE}" -- \
+    bash -c "PGPASSWORD='${DB_PASSWORD}' psql -U ${DB_USER} -d postgres -c 'DROP DATABASE IF EXISTS ${DB_NAME};'"
+kubectl exec "${POSTGRES_POD}" -n "${NAMESPACE}" -- \
+    bash -c "PGPASSWORD='${DB_PASSWORD}' psql -U ${DB_USER} -d postgres -c 'CREATE DATABASE ${DB_NAME};'"
 
 # Restore database
 log_info "Restoring database (this may take a while)..."
-kubectl exec "${POSTGRES_POD}" -n "${NAMESPACE}" -- psql -U "${DB_USER}" -d "${DB_NAME}" -f /tmp/synapse-backup.sql
+kubectl exec "${POSTGRES_POD}" -n "${NAMESPACE}" -- \
+    bash -c "PGPASSWORD='${DB_PASSWORD}' psql -U ${DB_USER} -d ${DB_NAME} -f /tmp/synapse-backup.sql"
 
 # Cleanup
 kubectl exec "${POSTGRES_POD}" -n "${NAMESPACE}" -- rm /tmp/synapse-backup.sql
