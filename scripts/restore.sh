@@ -159,19 +159,21 @@ DB_USER="synapse"  # Database user
 
 log_info "Database: ${DB_NAME}, User: ${DB_USER}"
 
-# 1. Restore Kubernetes Secrets (first, as they may be needed)
-if [ -f "${BACKUP_PATH}/secrets/postgresql-secret.yaml" ]; then
-    log_info "Restoring PostgreSQL secret..."
-    kubectl delete secret matrix-synapse-postgresql -n "${NAMESPACE}" 2>/dev/null || true
-    kubectl apply -f "${BACKUP_PATH}/secrets/postgresql-secret.yaml"
-    log_success "PostgreSQL secret restored"
-fi
+# 1. Restore Kubernetes Secrets (admin credentials only)
+# Note: We DO NOT restore the PostgreSQL secret because:
+# - The database has already been created with new credentials
+# - Restoring old credentials would cause authentication failures
+# - The synapse user in the restored DB will work with new credentials
+
+log_warning "Skipping PostgreSQL secret restore (using current credentials)"
 
 if [ -f "${BACKUP_PATH}/secrets/admin-credentials-secret.yaml" ]; then
     log_info "Restoring admin credentials secret..."
     kubectl delete secret matrix-synapse-admin-credentials -n "${NAMESPACE}" 2>/dev/null || true
     kubectl apply -f "${BACKUP_PATH}/secrets/admin-credentials-secret.yaml"
     log_success "Admin credentials secret restored"
+else
+    log_warning "Admin credentials secret not found in backup, keeping current"
 fi
 
 # 2. Restore PostgreSQL Database
