@@ -144,28 +144,30 @@ helm repo update
 # 2. Create namespace
 kubectl create namespace matrix
 
-# 3. Download and customize values
-helm show values matrix-synapse/matrix-synapse > values-prod.yaml
-vi values-prod.yaml  # Edit with your configuration
-
-# 4. Generate secrets (you'll need to clone the repo for this script)
+# 3. Clone repository for scripts and example config
 git clone https://github.com/ludolac/matrix-synapse-stack.git
 cd matrix-synapse-stack
+
+# 4. Create your production values file
+cp values-prod.yaml.example values-prod.yaml
+vi values-prod.yaml  # Edit with your configuration
+
+# 5. Generate secrets
 ./scripts/generate-secrets.sh all
 
-# 5. Install the chart
+# 6. Install the chart
 helm install matrix-synapse matrix-synapse/matrix-synapse \
   --namespace matrix \
   --values values-prod.yaml \
   --timeout 10m
 
-# 6. Wait for deployment
+# 7. Wait for deployment
 kubectl get pods -n matrix -w
 
-# 7. Get admin credentials
+# 8. Get admin credentials
 cat .secrets/admin-credentials.txt
 
-# 8. Access Element Web
+# 9. Access Element Web
 # Open https://element.example.com
 # Login with admin credentials
 ```
@@ -180,11 +182,12 @@ cd matrix-synapse-stack
 # 2. Create namespace
 kubectl create namespace matrix
 
-# 3. Generate secrets
-./scripts/generate-secrets.sh all
+# 3. Create your production values file
+cp values-prod.yaml.example values-prod.yaml
+vi values-prod.yaml  # Edit with your configuration
 
-# 4. Customize values (edit values-prod.yaml)
-vi values-prod.yaml
+# 4. Generate secrets
+./scripts/generate-secrets.sh all
 
 # 5. Install the chart
 helm install matrix-synapse . \
@@ -240,25 +243,25 @@ kubectl get storageclass
 kubectl get pods -n traefik
 ```
 
-#### Step 3: Download and Customize Values
+#### Step 3: Clone Repository and Prepare Configuration
 
 ```bash
-# Download the default values file
-helm show values matrix-synapse/matrix-synapse > values-prod.yaml
+# Clone the repository (needed for scripts and example config)
+git clone https://github.com/ludolac/matrix-synapse-stack.git
+cd matrix-synapse-stack
+
+# Create your production values file from example
+cp values-prod.yaml.example values-prod.yaml
 
 # Edit the values file with your configuration
 vi values-prod.yaml
 ```
 
+**Important**: `values-prod.yaml` is in `.gitignore` and should never be committed as it contains sensitive configuration.
+
 #### Step 4: Generate Secrets
 
-To use the secret generation scripts, you need to clone the repository:
-
 ```bash
-# Clone the repository
-git clone https://github.com/ludolac/matrix-synapse-stack.git
-cd matrix-synapse-stack
-
 # Generate all secrets (PostgreSQL + Admin)
 ./scripts/generate-secrets.sh all
 ```
@@ -304,7 +307,21 @@ kubectl get storageclass
 kubectl get pods -n traefik
 ```
 
-### Step 2: Generate Secrets
+### Step 2: Configure Values
+
+Create your production values file from the example:
+
+```bash
+# Copy example configuration
+cp values-prod.yaml.example values-prod.yaml
+
+# Edit with your configuration
+vi values-prod.yaml
+```
+
+**Important**: `values-prod.yaml` is in `.gitignore` to prevent committing sensitive configuration.
+
+### Step 3: Generate Secrets
 
 The chart requires secrets for PostgreSQL and admin user credentials:
 
@@ -324,15 +341,6 @@ Credentials are saved to:
 ├── admin-credentials.txt
 └── users/
     └── <username>.txt  # Created when you add users
-```
-
-### Step 3: Configure Values
-
-Copy and edit the production values file:
-
-```bash
-cp values.yaml values-prod.yaml
-vi values-prod.yaml
 ```
 
 **Key settings to configure:**
