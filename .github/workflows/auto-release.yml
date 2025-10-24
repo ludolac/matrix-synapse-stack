@@ -1,0 +1,110 @@
+name: Auto Release and Version Bump
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'Chart.yaml'
+      - '.github/workflows/auto-release.yml'
+
+jobs:
+  auto-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Get current version
+        id: get_version
+        run: |
+          CURRENT_VERSION=$(grep '^version:' Chart.yaml | awk '{print $2}')
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+
+      - name: Increment patch version
+        id: bump_version
+        run: |
+          CURRENT_VERSION="${{ steps.get_version.outputs.current_version }}"
+          # Split version into major.minor.patch
+          IFS='.' read -r -a version_parts <<< "$CURRENT_VERSION"
+          MAJOR="${version_parts[0]}"
+          MINOR="${version_parts[1]}"
+          PATCH="${version_parts[2]}"
+
+          # Increment patch version
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+
+      - name: Update Chart.yaml
+        run: |
+          NEW_VERSION="${{ steps.bump_version.outputs.new_version }}"
+          sed -i "s/^version:.*/version: $NEW_VERSION/" Chart.yaml
+
+          echo "Updated Chart.yaml:"
+          grep '^version:' Chart.yaml
+
+      - name: Commit version bump
+        run: |
+          NEW_VERSION="${{ steps.bump_version.outputs.new_version }}"
+          git add Chart.yaml
+          git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+          git push origin main
+
+      - name: Create and push tag
+        run: |
+          NEW_VERSION="${{ steps.bump_version.outputs.new_version }}"
+          git tag -a "v$NEW_VERSION" -m "Release version $NEW_VERSION"
+          git push origin "v$NEW_VERSION"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Package Helm chart
+        run: |
+          helm package .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.bump_version.outputs.new_version }}
+          name: Release v${{ steps.bump_version.outputs.new_version }}
+          body: |
+            ## Helm Chart Release v${{ steps.bump_version.outputs.new_version }}
+
+            ### Installation
+
+            ```bash
+            helm repo add matrix-synapse https://ludolac.github.io/matrix-synapse-stack/
+            helm repo update
+            helm install matrix-synapse matrix-synapse/matrix-synapse --version ${{ steps.bump_version.outputs.new_version }}
+            ```
+
+            Or download directly:
+
+            ```bash
+            helm pull oci://ghcr.io/${{ github.repository }}/matrix-synapse --version ${{ steps.bump_version.outputs.new_version }}
+            ```
+
+            ### Changes
+
+            See commit history for detailed changes.
+          files: |
+            *.tgz
+          draft: false
+          prerelease: false
