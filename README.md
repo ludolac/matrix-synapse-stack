@@ -7,6 +7,7 @@ Production-ready Helm chart for deploying Matrix Synapse homeserver with Element
 [![Synapse Version](https://img.shields.io/badge/synapse-v1.140.0-green)](https://github.com/element-hq/synapse)
 [![Security Scan](https://github.com/ludolac/matrix-synapse-stack/actions/workflows/trivy-scan.yml/badge.svg)](https://github.com/ludolac/matrix-synapse-stack/actions/workflows/trivy-scan.yml)
 [![Security](https://img.shields.io/badge/security-trivy-blue?logo=security)](https://github.com/ludolac/matrix-synapse-stack/security/code-scanning)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## 🔒 Security Scan Summary
 
@@ -1090,11 +1091,22 @@ For issues or questions:
 
 ## License
 
-This Helm chart is provided as-is for deploying Matrix Synapse.
+This Helm chart is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
-- Matrix Synapse: Apache License 2.0
-- Element Web: Apache License 2.0
-- PostgreSQL: PostgreSQL License
+**Deployed Software Licenses:**
+- **Matrix Synapse**: Apache License 2.0
+- **Element Web**: Apache License 2.0
+- **PostgreSQL**: PostgreSQL License
+
+### MIT License Summary
+
+You are free to:
+- ✅ Use this chart commercially or personally
+- ✅ Modify and distribute the chart
+- ✅ Use privately without restrictions
+- ✅ Sublicense and sell copies
+
+The only requirement is to include the copyright notice and license in any substantial portions of the software.
 
 ---
 
