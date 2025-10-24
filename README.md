@@ -16,16 +16,16 @@ Production-ready Helm chart for deploying Matrix Synapse homeserver with Element
 
 | Scan Type | Status | Schedule | Critical | High | Medium | Low |
 |-----------|--------|----------|----------|------|--------|-----|
-| **Configuration** | ![Status](https://img.shields.io/badge/status-scanning-yellow) | Daily at 2AM UTC | ![Critical](https://img.shields.io/badge/critical-0-success) | ![High](https://img.shields.io/badge/high-0-success) | ![Medium](https://img.shields.io/badge/medium-0-success) | ![Low](https://img.shields.io/badge/low-0-informational) |
-| **Helm Manifests** | ![Status](https://img.shields.io/badge/status-scanning-yellow) | On every push | ![Critical](https://img.shields.io/badge/critical-0-success) | ![High](https://img.shields.io/badge/high-0-success) | ![Medium](https://img.shields.io/badge/medium-0-success) | ![Low](https://img.shields.io/badge/low-0-informational) |
-| **Container Images** | ![Status](https://img.shields.io/badge/status-scanning-yellow) | Daily + On Push | ![Critical](https://img.shields.io/badge/critical-0-success) | ![High](https://img.shields.io/badge/high-0-success) | ![Medium](https://img.shields.io/badge/medium-0-success) | ![Low](https://img.shields.io/badge/low-0-informational) |
+| **Configuration** | ![Status](https://img.shields.io/badge/status-scanned-success) | Daily at 2AM UTC | ![Critical](https://img.shields.io/badge/critical-0-success) | ![High](https://img.shields.io/badge/high-4-important) | ![Medium](https://img.shields.io/badge/medium-7-orange) | ![Low](https://img.shields.io/badge/low-20-informational) |
+| **Helm Manifests** | ![Status](https://img.shields.io/badge/status-scanned-success) | On every push | ![Critical](https://img.shields.io/badge/critical-0-success) | ![High](https://img.shields.io/badge/high-4-important) | ![Medium](https://img.shields.io/badge/medium-7-orange) | ![Low](https://img.shields.io/badge/low-20-informational) |
+| **Container Images** | ![Status](https://img.shields.io/badge/status-scanned-success) | Daily + On Push | ![Critical](https://img.shields.io/badge/critical-5-critical) | ![High](https://img.shields.io/badge/high-15-important) | ![Medium](https://img.shields.io/badge/medium-49-orange) | ![Low](https://img.shields.io/badge/low-88-informational) |
 
 ### Container Images Scanned
 
 | Image | Version | Critical | High | Medium | Low |
 |-------|---------|----------|------|--------|-----|
-| **Synapse** | v1.140.0 | ![Critical](https://img.shields.io/badge/critical-0-success) | ![High](https://img.shields.io/badge/high-0-success) | ![Medium](https://img.shields.io/badge/medium-0-success) | ![Low](https://img.shields.io/badge/low-0-informational) |
-| **Element Web** | v1.12.2 | ![Critical](https://img.shields.io/badge/critical-0-success) | ![High](https://img.shields.io/badge/high-0-success) | ![Medium](https://img.shields.io/badge/medium-0-success) | ![Low](https://img.shields.io/badge/low-0-informational) |
+| **Synapse** | v1.140.0 | ![Critical](https://img.shields.io/badge/critical-4-critical) | ![High](https://img.shields.io/badge/high-15-important) | ![Medium](https://img.shields.io/badge/medium-45-orange) | ![Low](https://img.shields.io/badge/low-86-informational) |
+| **Element Web** | v1.12.2 | ![Critical](https://img.shields.io/badge/critical-1-critical) | ![High](https://img.shields.io/badge/high-0-success) | ![Medium](https://img.shields.io/badge/medium-4-orange) | ![Low](https://img.shields.io/badge/low-2-informational) |
 | **PostgreSQL** | 16-alpine | ![Critical](https://img.shields.io/badge/critical-0-success) | ![High](https://img.shields.io/badge/high-0-success) | ![Medium](https://img.shields.io/badge/medium-0-success) | ![Low](https://img.shields.io/badge/low-0-informational) |
 
 ### Security Features
