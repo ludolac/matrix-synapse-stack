@@ -1,0 +1,151 @@
+name: Trivy Security Scan
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  trivy-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner in repo mode
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Trivy vulnerability scanner (table format)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          format: 'table'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '0'
+
+  trivy-helm-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Template Helm chart
+        run: |
+          helm template matrix-synapse . \
+            --set postgresql.auth.password=test-password \
+            --set synapse.server.registrationSharedSecret=test-secret \
+            > rendered-manifests.yaml
+
+      - name: Run Trivy scanner on rendered manifests
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: 'rendered-manifests.yaml'
+          format: 'table'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '0'
+
+  security-summary:
+    runs-on: ubuntu-latest
+    needs: [trivy-scan, trivy-helm-scan]
+    if: always()
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Trivy to generate JSON report
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          format: 'json'
+          output: 'trivy-report.json'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+
+      - name: Generate security badge
+        id: badge
+        run: |
+          # Count vulnerabilities by severity
+          CRITICAL=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity=="CRITICAL")] | length' trivy-report.json || echo 0)
+          HIGH=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity=="HIGH")] | length' trivy-report.json || echo 0)
+          MEDIUM=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity=="MEDIUM")] | length' trivy-report.json || echo 0)
+
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "high=$HIGH" >> $GITHUB_OUTPUT
+          echo "medium=$MEDIUM" >> $GITHUB_OUTPUT
+
+          # Determine badge color
+          if [ "$CRITICAL" -gt 0 ]; then
+            COLOR="critical"
+            STATUS="Critical: $CRITICAL"
+          elif [ "$HIGH" -gt 0 ]; then
+            COLOR="red"
+            STATUS="High: $HIGH"
+          elif [ "$MEDIUM" -gt 0 ]; then
+            COLOR="orange"
+            STATUS="Medium: $MEDIUM"
+          else
+            COLOR="success"
+            STATUS="Passing"
+          fi
+
+          echo "color=$COLOR" >> $GITHUB_OUTPUT
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+
+      - name: Create security summary
+        run: |
+          cat > security-summary.md <<EOF
+          # Security Scan Summary
+
+          **Last Scan:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+          ## Vulnerability Count
+          - 🔴 Critical: ${{ steps.badge.outputs.critical }}
+          - 🟠 High: ${{ steps.badge.outputs.high }}
+          - 🟡 Medium: ${{ steps.badge.outputs.medium }}
+
+          ## Status
+          ${{ steps.badge.outputs.status }}
+
+          View detailed results in the [Security tab](https://github.com/${{ github.repository }}/security/code-scanning).
+          EOF
+
+          cat security-summary.md
+
+      - name: Upload security summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-summary
+          path: security-summary.md

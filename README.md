@@ -5,6 +5,8 @@ Production-ready Helm chart for deploying Matrix Synapse homeserver with Element
 [![Helm Chart](https://img.shields.io/badge/helm-chart-blue)](https://ludolac.github.io/matrix-synapse-stack/)
 [![Chart Version](https://img.shields.io/badge/dynamic/yaml?url=https://ludolac.github.io/matrix-synapse-stack/index.yaml&query=$.entries.matrix-synapse[0].version&label=chart&color=0F1689&logo=helm)](https://ludolac.github.io/matrix-synapse-stack/)
 [![Synapse Version](https://img.shields.io/badge/synapse-v1.140.0-green)](https://github.com/element-hq/synapse)
+[![Security Scan](https://github.com/ludolac/matrix-synapse-stack/actions/workflows/trivy-scan.yml/badge.svg)](https://github.com/ludolac/matrix-synapse-stack/actions/workflows/trivy-scan.yml)
+[![Security](https://img.shields.io/badge/security-trivy-blue?logo=security)](https://github.com/ludolac/matrix-synapse-stack/security/code-scanning)
 
 ## Installation
 
