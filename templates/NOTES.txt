@@ -1,0 +1,86 @@
+{{- $synapseHost := index .Values.ingress.synapse.hosts 0 | default (printf "%s-synapse" (include "matrix-synapse.fullname" .)) -}}
+{{- $elementHost := index .Values.ingress.element.hosts 0 | default (printf "%s-element" (include "matrix-synapse.fullname" .)) -}}
+
+█▀▄▀█ ▄▀█ ▀█▀ █▀█ █ ▀▄▀   █▀ █▄█ █▄ █ ▄▀█ █▀█ █▀ █▀▀
+█ ▀ █ █▀█  █  █▀▄ █ █ █   ▄█  █  █ ▀█ █▀█ █▀▀ ▄█ ██▄
+
+Thank you for installing {{ .Chart.Name }}!
+Version: {{ .Chart.Version }}
+App Version: {{ .Chart.AppVersion }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🌐 ACCESS YOUR MATRIX SERVER:
+
+{{- if .Values.ingress.enabled }}
+  Element Web:  https://{{ .Values.ingress.element.host }}
+  Synapse API:  https://{{ .Values.ingress.synapse.host }}
+  
+  {{- if .Values.coturn.enabled }}
+  TURN Server:  turn://{{ .Values.coturn.service.externalDns.hostname }}:3478
+  {{- end }}
+{{- else }}
+  # Get the application URLs by running:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "matrix-synapse.fullname" . }}-synapse 8008:80
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "matrix-synapse.fullname" . }}-element 8080:80
+{{- end }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 NEXT STEPS:
+
+{{- if .Values.secrets.autoGenerate }}
+⚠️  WARNING: Auto-generated secrets detected!
+   For production, generate secrets manually:
+   ./generate-secrets.sh all
+{{- end }}
+
+{{- if .Values.synapse.server.adminUser.enabled }}
+✅ Admin user will be created: {{ .Values.synapse.server.adminUser.username }}
+   Password stored in secret: {{ .Values.synapse.server.adminUser.passwordSecret.name }}
+{{- end }}
+
+{{- if .Values.coturn.enabled }}
+✅ TURN server enabled for video/voice calls
+   {{- if not .Values.coturn.service.externalDns.enabled }}
+   ⚠️  External DNS not enabled - configure DNS manually:
+      {{ .Values.coturn.service.externalDns.hostname }} → LoadBalancer IP
+   {{- end }}
+{{- else }}
+⚠️  TURN server disabled - video/voice calls may not work behind NAT
+{{- end }}
+
+{{- if .Values.synapse.server.sso.enabled }}
+✅ SSO/OIDC enabled
+{{- end }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔍 VERIFY INSTALLATION:
+
+  # Check pod status
+  kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+
+  # Check Synapse logs
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=synapse --tail=50
+
+  {{- if .Values.coturn.enabled }}
+  # Check TURN server
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=coturn --tail=50
+  {{- end }}
+
+  # Test federation (if enabled)
+  curl https://federationtester.matrix.org/api/report?server_name={{ .Values.synapse.server.name }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 DOCUMENTATION:
+
+  Chart: https://github.com/ludolac/matrix-synapse-stack
+  Matrix: https://matrix.org/docs
+  Synapse: https://element-hq.github.io/synapse/latest/
+  Element: https://element.io/user-guide
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Happy chatting! 💬

@@ -1,6 +1,7 @@
 # Secrets backup directory
 .secrets/
 *.txt
+!templates/NOTES.txt
 *.key
 
 # Backup directory
