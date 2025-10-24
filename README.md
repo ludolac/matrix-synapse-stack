@@ -2,6 +2,16 @@
 
 Production-ready Helm chart for deploying Matrix Synapse homeserver with Element Web client on Kubernetes.
 
+## Installation
+
+```bash
+helm repo add matrix-synapse https://ludolac.github.io/matrix-synapse-stack/
+helm repo update
+helm install matrix-synapse matrix-synapse/matrix-synapse --namespace matrix --values values-prod.yaml
+```
+
+See the [Installation](#installation) section for detailed instructions.
+
 ## Table of Contents
 
 - [Features](#features)
@@ -69,9 +79,48 @@ You need two DNS records pointing to your ingress:
 
 ## Quick Start
 
+### Option 1: Install from Helm Repository (Recommended)
+
 ```bash
-# 1. Clone or navigate to the chart directory
-cd matrix-synapse-chart
+# 1. Add Helm repository
+helm repo add matrix-synapse https://ludolac.github.io/matrix-synapse-stack/
+helm repo update
+
+# 2. Create namespace
+kubectl create namespace matrix
+
+# 3. Download and customize values
+helm show values matrix-synapse/matrix-synapse > values-prod.yaml
+vi values-prod.yaml  # Edit with your configuration
+
+# 4. Generate secrets (you'll need to clone the repo for this script)
+git clone https://github.com/ludolac/matrix-synapse-stack.git
+cd matrix-synapse-stack
+./scripts/generate-secrets.sh all
+
+# 5. Install the chart
+helm install matrix-synapse matrix-synapse/matrix-synapse \
+  --namespace matrix \
+  --values values-prod.yaml \
+  --timeout 10m
+
+# 6. Wait for deployment
+kubectl get pods -n matrix -w
+
+# 7. Get admin credentials
+cat .secrets/admin-credentials.txt
+
+# 8. Access Element Web
+# Open https://element.example.com
+# Login with admin credentials
+```
+
+### Option 2: Install from Source
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/ludolac/matrix-synapse-stack.git
+cd matrix-synapse-stack
 
 # 2. Create namespace
 kubectl create namespace matrix
@@ -103,9 +152,93 @@ cat .secrets/admin-credentials.txt
 
 ## Installation
 
-### Step 1: Prepare Your Environment
+There are two ways to install this chart:
+
+1. **From Helm Repository** - Use the published Helm repository (recommended for production)
+2. **From Source** - Clone the repository and install locally (recommended for development)
+
+### Installation from Helm Repository
+
+#### Step 1: Add Helm Repository
 
 ```bash
+# Add the Matrix Synapse Helm repository
+helm repo add matrix-synapse https://ludolac.github.io/matrix-synapse-stack/
+
+# Update your local Helm chart repository cache
+helm repo update
+
+# Verify the chart is available
+helm search repo matrix-synapse
+```
+
+#### Step 2: Prepare Your Environment
+
+```bash
+# Create namespace
+kubectl create namespace matrix
+
+# Verify storage class is available
+kubectl get storageclass
+
+# Verify ingress controller is running
+kubectl get pods -n ingress-nginx
+```
+
+#### Step 3: Download and Customize Values
+
+```bash
+# Download the default values file
+helm show values matrix-synapse/matrix-synapse > values-prod.yaml
+
+# Edit the values file with your configuration
+vi values-prod.yaml
+```
+
+#### Step 4: Generate Secrets
+
+To use the secret generation scripts, you need to clone the repository:
+
+```bash
+# Clone the repository
+git clone https://github.com/ludolac/matrix-synapse-stack.git
+cd matrix-synapse-stack
+
+# Generate all secrets (PostgreSQL + Admin)
+./scripts/generate-secrets.sh all
+```
+
+#### Step 5: Install the Chart
+
+```bash
+# Install from the Helm repository
+helm install matrix-synapse matrix-synapse/matrix-synapse \
+  --namespace matrix \
+  --values values-prod.yaml \
+  --timeout 10m
+```
+
+#### Step 6: Verify Deployment
+
+```bash
+# Check pods
+kubectl get pods -n matrix
+
+# Get admin credentials
+cat .secrets/admin-credentials.txt
+```
+
+---
+
+### Installation from Source
+
+#### Step 1: Prepare Your Environment
+
+```bash
+# Clone the repository
+git clone https://github.com/ludolac/matrix-synapse-stack.git
+cd matrix-synapse-stack
+
 # Create namespace
 kubectl create namespace matrix
 
@@ -749,10 +882,45 @@ SELECT pg_size_pretty(pg_database_size('synapse_prod'));
 
 ### Upgrade Chart Version
 
+#### From Helm Repository
+
 ```bash
 # Backup first!
 kubectl exec matrix-synapse-postgresql-0 -n matrix -- \
   pg_dump -U synapse synapse_prod | gzip > backup-before-upgrade.sql.gz
+
+# Update Helm repository cache
+helm repo update
+
+# Check available versions
+helm search repo matrix-synapse/matrix-synapse --versions
+
+# Upgrade to latest version
+helm upgrade matrix-synapse matrix-synapse/matrix-synapse \
+  --namespace matrix \
+  --values values-prod.yaml \
+  --timeout 10m
+
+# Or upgrade to specific version
+helm upgrade matrix-synapse matrix-synapse/matrix-synapse \
+  --namespace matrix \
+  --values values-prod.yaml \
+  --version 1.2.0 \
+  --timeout 10m
+
+# Verify
+kubectl get pods -n matrix
+```
+
+#### From Source
+
+```bash
+# Backup first!
+kubectl exec matrix-synapse-postgresql-0 -n matrix -- \
+  pg_dump -U synapse synapse_prod | gzip > backup-before-upgrade.sql.gz
+
+# Pull latest changes
+git pull origin main
 
 # Update chart
 helm upgrade matrix-synapse . \
