@@ -1,71 +1,16 @@
 # Patterns to ignore when building packages.
-# This supports shell glob matching, relative path matching, and
-# negation (prefixed with !). Only one pattern per line.
-
-# Common VCS dirs
 .git/
 .gitignore
-.bzr/
-.bzrignore
-.hg/
-.hgignore
-.svn/
-
-# Common backup files
 *.swp
 *.bak
 *.tmp
-*.backup
 *~
 .DS_Store
-
-# CI/CD files
-.github/
-.gitlab-ci.yml
-.travis.yml
-.circleci/
-
-# Scripts directory (backup/restore scripts not needed in package)
-scripts/
-
-# Production values file (users should provide their own)
-values-prod.yaml
-values-prod.yaml.bak
-values-prod.yaml.backup
-
-# Backup and secrets directories
 .backup/
-.secrets/
-backup-*/
-
-# Test files
+values-*.yaml
+!values.yaml
+TRAEFIK-TURN-SETUP.md
+scripts/
 test/
 tests/
-*_test.yaml
-
-# IDE and editor files
-.vscode/
-.idea/
-*.iml
-.project
-.classpath
-.settings/
-*.sublime-*
-
-# OS files
-Thumbs.db
-
-# Temporary files
-*.orig
-*.rej
-
-# Other Helm charts (dependencies)
-charts/
-*.tgz
-
-# Documentation files (keep them minimal)
-scripts/BACKUP-RESTORE.md
-2FA-USER-GUIDE.md
-AUTHELIA-SSO-SETUP.md
-MAS-INTEGRATION-GUIDE.md
-SSO-CONFIGURATION.md
+.github/

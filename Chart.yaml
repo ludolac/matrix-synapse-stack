@@ -2,7 +2,7 @@ apiVersion: v2
 name: matrix-synapse
 description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn TURN server on Kubernetes
 type: application
-version: 1.3.2
+version: 1.4.0
 appVersion: "1.140.0"
 keywords:
   - matrix
@@ -15,9 +15,11 @@ keywords:
   - messaging
   - video-calls
 home: https://matrix.org
+icon: https://matrix.org/images/matrix-logo.svg
 sources:
   - https://github.com/element-hq/synapse
   - https://github.com/element-hq/element-web
+  - https://github.com/coturn/coturn
 maintainers:
   - name: WAADOO
     email: contact@waadoo.ovh

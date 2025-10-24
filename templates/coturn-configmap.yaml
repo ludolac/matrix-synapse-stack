@@ -31,9 +31,9 @@ data:
     # Realm for TURN server
     realm={{ .Values.coturn.realm }}
 
-    # Authentication - use shared secret from environment variable
+    # Authentication - use shared secret (passed via command line argument)
     use-auth-secret
-    static-auth-secret=${TURN_SHARED_SECRET}
+    # Note: static-auth-secret is passed via command line to support environment variable expansion
 
     # Security: Disable insecure protocols
     no-tlsv1
@@ -91,9 +91,8 @@ data:
     # Security: Disable CLI
     no-cli
 
-    # Security: Run as unprivileged user
-    proc-user={{ .Values.coturn.user }}
-    proc-group={{ .Values.coturn.group }}
+    # Note: User/group privileges are managed by Kubernetes securityContext in the deployment
+    # The container already runs as UID/GID 65534 (nobody:nogroup)
 
     {{- if .Values.coturn.prometheusExporter.enabled }}
     # Prometheus metrics

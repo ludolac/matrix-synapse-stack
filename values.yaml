@@ -552,11 +552,10 @@ coturn:
   relayPortRange:
     min: 49152
     max: 49252  # 100 ports (adjust based on expected concurrent calls)
-  
-  # Security: User and group to run coturn as
-  user: "nobody"
-  group: "nogroup"
-  
+
+  # Note: User/group privileges are managed by Kubernetes securityContext
+  # The coturn container runs as UID/GID 65534 (nobody:nogroup)
+
   # Resource quotas to prevent abuse
   userQuota: 0        # 0 = no per-user quota
   totalQuota: 100     # Maximum 100 concurrent sessions

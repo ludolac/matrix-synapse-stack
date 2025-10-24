@@ -80,7 +80,7 @@ spec:
                   key: authelia-client-secret
             {{- end }}
             {{- end }}
-            {{- if .Values.synapse.server.turn.enabled }}
+            {{- if or .Values.synapse.server.turn.enabled .Values.coturn.enabled }}
             - name: TURN_SHARED_SECRET
               valueFrom:
                 secretKeyRef:

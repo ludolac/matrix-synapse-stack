@@ -85,16 +85,22 @@ data:
     {{- if or .Values.synapse.server.turn.enabled .Values.coturn.enabled }}
     turn_uris:
       {{- if .Values.coturn.enabled }}
-      # Auto-configured internal coturn service
+      {{- if and .Values.coturn.service.externalDns.enabled .Values.coturn.service.externalDns.hostname }}
+      # Auto-configured public coturn service (external-dns enabled)
+      - "turn:{{ .Values.coturn.service.externalDns.hostname }}:3478?transport=udp"
+      - "turn:{{ .Values.coturn.service.externalDns.hostname }}:3478?transport=tcp"
+      {{- if .Values.coturn.tls.enabled }}
+      - "turns:{{ .Values.coturn.service.externalDns.hostname }}:5349?transport=udp"
+      - "turns:{{ .Values.coturn.service.externalDns.hostname }}:5349?transport=tcp"
+      {{- end }}
+      {{- else }}
+      # Auto-configured internal coturn service (cluster-only)
       - "turn:{{ include "matrix-synapse.fullname" . }}-coturn.{{ .Release.Namespace }}.svc.cluster.local:3478?transport=udp"
       - "turn:{{ include "matrix-synapse.fullname" . }}-coturn.{{ .Release.Namespace }}.svc.cluster.local:3478?transport=tcp"
       {{- if .Values.coturn.tls.enabled }}
       - "turns:{{ include "matrix-synapse.fullname" . }}-coturn.{{ .Release.Namespace }}.svc.cluster.local:5349?transport=udp"
       - "turns:{{ include "matrix-synapse.fullname" . }}-coturn.{{ .Release.Namespace }}.svc.cluster.local:5349?transport=tcp"
       {{- end }}
-      {{- if .Values.coturn.ingress.enabled }}
-      # Public TURNS endpoint via ingress
-      - "turns:{{ .Values.coturn.ingress.hostname }}:5349?transport=tcp"
       {{- end }}
       {{- end }}
       {{- if .Values.synapse.server.turn.enabled }}

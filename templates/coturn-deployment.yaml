@@ -37,6 +37,11 @@ spec:
             {{- toYaml .Values.coturn.securityContext | nindent 12 }}
           image: "{{ .Values.coturn.image.repository }}:{{ .Values.coturn.image.tag }}"
           imagePullPolicy: {{ .Values.coturn.image.pullPolicy }}
+          command:
+            - turnserver
+            - -c
+            - /etc/coturn/turnserver.conf
+            - --static-auth-secret=$(TURN_SHARED_SECRET)
           env:
             - name: TURN_SHARED_SECRET
               valueFrom:
