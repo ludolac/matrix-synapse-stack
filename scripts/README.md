@@ -223,15 +223,25 @@ kubectl rollout restart statefulset/matrix-synapse-postgresql -n matrix
 
 ## create-user.sh
 
-**Create additional Matrix users on a running Synapse deployment**
+**Manage Matrix users on a running Synapse deployment - create, list, and delete users**
 
 ### Synopsis
 
 ```bash
-./scripts/create-user.sh [options]
+./scripts/create-user.sh <command> [options]
 ```
 
-### Options
+### Commands
+
+```bash
+create              Create a new user
+list                List all users on the server
+delete              Delete a user (permanently erase account and data)
+update-password     Update a user's password
+deactivate          Deactivate a user account (keeps data, prevents login)
+```
+
+### Create User Options
 
 ```bash
 -u, --username USERNAME       Username (required, without @ or :domain)
@@ -239,40 +249,126 @@ kubectl rollout restart statefulset/matrix-synapse-postgresql -n matrix
 -e, --email EMAIL            Email address (optional)
 -a, --admin                  Make user a server admin (default: false)
 -d, --display-name NAME      Display name (optional)
--n, --namespace NAMESPACE    Kubernetes namespace (default: matrix)
--r, --release RELEASE        Helm release name (default: matrix-synapse)
 -h, --help                   Show help message
+```
+
+### List User Options
+
+```bash
+--guests               Show only guest users
+--admins               Show only admin users
+--deactivated          Show only deactivated users
+-h, --help             Show help message
+```
+
+### Delete User Options
+
+```bash
+-u, --username USERNAME     Username to delete (required, without @ or :domain)
+-y, --yes                  Skip confirmation prompt
+-h, --help                 Show help message
+```
+
+### Update Password Options
+
+```bash
+-u, --username USERNAME     Username (required, without @ or :domain)
+-p, --password PASSWORD     New password (optional, auto-generated if not provided)
+-y, --yes                  Skip confirmation prompt
+-h, --help                 Show help message
+```
+
+### Deactivate User Options
+
+```bash
+-u, --username USERNAME     Username to deactivate (required, without @ or :domain)
+-y, --yes                  Skip confirmation prompt
+-h, --help                 Show help message
+```
+
+### Environment Variables
+
+```bash
+NAMESPACE              Kubernetes namespace (default: matrix)
+RELEASE_NAME           Helm release name (default: matrix-synapse)
 ```
 
 ### Examples
 
 **Create basic user:**
 ```bash
-./scripts/create-user.sh -u alice -e alice@example.com
+./scripts/create-user.sh create -u alice -e alice@example.com
 ```
 
 **Create admin user:**
 ```bash
-./scripts/create-user.sh -u admin2 -e admin2@example.com -a
+./scripts/create-user.sh create -u admin2 -e admin2@example.com -a
 ```
 
 **Create user with custom password:**
 ```bash
-./scripts/create-user.sh -u bob -p MySecurePass123! -e bob@example.com
+./scripts/create-user.sh create -u bob -p MySecurePass123! -e bob@example.com
 ```
 
 **Create user with display name:**
 ```bash
-./scripts/create-user.sh -u charlie -d "Charlie Brown" -e charlie@example.com
+./scripts/create-user.sh create -u charlie -d "Charlie Brown" -e charlie@example.com
 ```
 
-**Create for custom namespace:**
+**List all users:**
 ```bash
-./scripts/create-user.sh -u alice -e alice@example.com -n my-matrix
+./scripts/create-user.sh list
+```
+
+**List only admin users:**
+```bash
+./scripts/create-user.sh list --admins
+```
+
+**List only deactivated users:**
+```bash
+./scripts/create-user.sh list --deactivated
+```
+
+**Delete a user (with confirmation):**
+```bash
+./scripts/create-user.sh delete -u john
+```
+
+**Delete user without confirmation:**
+```bash
+./scripts/create-user.sh delete -u john -y
+```
+
+**Update user password (auto-generated):**
+```bash
+./scripts/create-user.sh update-password -u alice
+```
+
+**Update user password (custom password):**
+```bash
+./scripts/create-user.sh update-password -u alice -p NewSecurePass456!
+```
+
+**Deactivate user (keeps data):**
+```bash
+./scripts/create-user.sh deactivate -u bob
+```
+
+**Deactivate without confirmation:**
+```bash
+./scripts/create-user.sh deactivate -u bob -y
+```
+
+**Use custom namespace:**
+```bash
+NAMESPACE=my-matrix ./scripts/create-user.sh list
+NAMESPACE=my-matrix ./scripts/create-user.sh update-password -u alice
 ```
 
 ### What It Does
 
+**Create Command:**
 1. **Validates** username doesn't already exist
 2. **Retrieves** registration shared secret from Kubernetes
 3. **Determines** server name from Synapse configuration
@@ -280,9 +376,41 @@ kubectl rollout restart statefulset/matrix-synapse-postgresql -n matrix
 5. **Saves** credentials to `.secrets/users/<username>.txt`
 6. **Displays** credentials for immediate use
 
+**List Command:**
+1. **Authenticates** using admin credentials from Kubernetes secret
+2. **Fetches** user list via Synapse Admin API (`/_synapse/admin/v2/users`)
+3. **Parses** JSON response (uses Python if available, falls back to grep)
+4. **Displays** formatted table with: Username, Admin status, Guest status, Active/Deactivated
+5. **Supports** filtering by admin, guest, or deactivated status
+
+**Delete Command:**
+1. **Confirms** deletion with user (unless `-y` flag provided)
+2. **Authenticates** using admin credentials from Kubernetes secret
+3. **Deletes** user and erases all data via Synapse Admin API (`/_synapse/admin/v1/deactivate/<user>` with `erase: true`)
+4. **Removes** local credential file from `.secrets/users/` if exists
+5. **Logs out** user and prevents future logins (CANNOT be undone)
+6. **Reserves** username permanently - deleted usernames CANNOT be reused (Synapse limitation)
+
+**Update Password Command:**
+1. **Confirms** password update with user (unless `-y` flag provided)
+2. **Generates** secure random password if not provided (32 characters)
+3. **Authenticates** using admin credentials from Kubernetes secret
+4. **Updates** password via Synapse Admin API (`/_synapse/admin/v2/users/<user>` PUT request)
+5. **Updates** local credential file in `.secrets/users/` with new password
+6. **Forces** user to re-login with new password on all devices
+
+**Deactivate Command:**
+1. **Confirms** deactivation with user (unless `-y` flag provided)
+2. **Authenticates** using admin credentials from Kubernetes secret
+3. **Deactivates** user via Synapse Admin API (`/_synapse/admin/v1/deactivate/<user>` with `erase: false`)
+4. **Preserves** all user data (messages, rooms, etc.) in database
+5. **Logs out** user from all sessions and prevents future logins
+6. **Marks** local credential file as deactivated (keeps file for records)
+7. **Note:** Username remains reserved and cannot be reused (Synapse limitation)
+
 ### Output
 
-**Success message:**
+**Create Command - Success message:**
 ```
 ==========================================
   User Created Successfully!
@@ -295,6 +423,95 @@ Display Name: Alice
 ==========================================
 
 Credentials saved to: .secrets/users/alice.txt
+```
+
+**List Command - Output:**
+```
+==========================================
+  Matrix Synapse Users
+==========================================
+Username                       Admin      Guest        Status
+----------------------------------------
+@admin:matrix.example.com      Yes        No           Active
+@alice:matrix.example.com      No         No           Active
+@bob:matrix.example.com        No         No           Deactivated
+@charlie:matrix.example.com    No         No           Active
+==========================================
+
+Total users: 4
+```
+
+**Delete Command - Output:**
+```
+[WARNING] This will PERMANENTLY DELETE the user account: @john:matrix.example.com
+[WARNING] The user will be logged out and all their data will be erased.
+[WARNING] The username will still be reserved and CANNOT be reused.
+[WARNING] This action CANNOT be undone!
+
+Are you sure you want to delete this user? (yes/no): yes
+
+[INFO] Authenticating...
+[INFO] Deleting user @john:matrix.example.com and erasing all data...
+[SUCCESS] User @john:matrix.example.com has been deleted and all data erased!
+[INFO] Removed local credential file
+
+==========================================
+  User Deleted
+==========================================
+Username: @john:matrix.example.com
+Status: Deleted (data erased)
+
+[WARNING] Note: The username 'john' is now reserved
+[WARNING] and CANNOT be reused for a new account.
+[WARNING] This is a Matrix Synapse limitation.
+==========================================
+```
+
+**Update Password Command - Output:**
+```
+[WARNING] This will update the password for: @alice:matrix.example.com
+
+Are you sure you want to update this user's password? (yes/no): yes
+
+[INFO] Authenticating...
+[INFO] Auto-generated password for user
+[INFO] Updating password for @alice:matrix.example.com...
+[SUCCESS] Password updated successfully for @alice:matrix.example.com!
+[INFO] Updated local credential file
+
+==========================================
+  Password Updated
+==========================================
+Username: @alice:matrix.example.com
+New Password: xYz789NewPassword...
+==========================================
+
+[INFO] User must re-login with the new password
+```
+
+**Deactivate Command - Output:**
+```
+[WARNING] This will DEACTIVATE the user account: @bob:matrix.example.com
+[WARNING] The user will be logged out and cannot log in again.
+[WARNING] User data will be PRESERVED (not deleted).
+[WARNING] This action CANNOT be undone!
+
+Are you sure you want to deactivate this user? (yes/no): yes
+
+[INFO] Authenticating...
+[INFO] Deactivating user @bob:matrix.example.com (keeping data)...
+[SUCCESS] User @bob:matrix.example.com has been deactivated!
+[INFO] Marked local credential file as deactivated
+
+==========================================
+  User Deactivated
+==========================================
+Username: @bob:matrix.example.com
+Status: Deactivated (data preserved)
+
+[INFO] Note: User data is preserved in database
+[INFO] The user cannot login but messages/rooms remain
+==========================================
 ```
 
 ### Credential Files
@@ -328,6 +545,8 @@ Created: 2025-10-24 12:30:45
 
 ### Common Errors
 
+**Create Command Errors:**
+
 **User already exists:**
 ```
 [ERROR] User @alice:matrix.example.com already exists!
@@ -345,6 +564,46 @@ Created: 2025-10-24 12:30:45
 [ERROR] Could not retrieve registration secret!
 ```
 **Solution:** Regenerate admin secret: `./scripts/generate-secrets.sh admin`
+
+**List Command Errors:**
+
+**Could not retrieve admin credentials:**
+```
+[ERROR] Could not retrieve admin credentials!
+```
+**Solution:** Ensure admin credentials secret exists:
+```bash
+kubectl get secret matrix-synapse-admin-credentials -n matrix
+# If missing, regenerate secrets:
+./scripts/generate-secrets.sh admin
+```
+
+**Failed to authenticate:**
+```
+[ERROR] Failed to authenticate. Check admin credentials.
+```
+**Solution:** Verify admin credentials are correct:
+```bash
+kubectl get secret matrix-synapse-admin-credentials -n matrix -o yaml
+```
+
+**Delete Command Errors:**
+
+**User not found:**
+```
+# API returns error when user doesn't exist
+```
+**Solution:** Use `./scripts/create-user.sh list` to verify username
+
+**Username already taken (after deletion):**
+```
+[ERROR] User ID already taken.
+```
+**Solution:** This is a **Matrix Synapse limitation** - deleted usernames are permanently reserved and cannot be reused. You must choose a different username (e.g., `alice` → `alice2` or `alice_new`).
+
+**Why this happens:** When you delete a user, Synapse marks the account as deactivated in the database but does NOT remove the user ID. This prevents security issues like user impersonation and maintains message history integrity.
+
+**General Errors:**
 
 **Pod not ready:**
 ```
