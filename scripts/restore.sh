@@ -202,6 +202,17 @@ else
     kubectl cp "${DB_BACKUP}" "${NAMESPACE}/${POSTGRES_POD}:/tmp/synapse-backup.sql"
 fi
 
+# Scale down Synapse to prevent new connections
+log_info "Scaling down Synapse deployment..."
+kubectl scale deployment -n "${NAMESPACE}" -l app.kubernetes.io/component=synapse --replicas=0
+log_info "Waiting for Synapse pods to terminate..."
+kubectl wait --for=delete pod -n "${NAMESPACE}" -l app.kubernetes.io/component=synapse --timeout=60s 2>/dev/null || true
+
+# Terminate all remaining connections to the database
+log_info "Terminating any remaining database connections..."
+kubectl exec "${POSTGRES_POD}" -n "${NAMESPACE}" -- \
+    psql -h 127.0.0.1 -U "${DB_USER}" postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${DB_NAME}' AND pid <> pg_backend_pid();" || true
+
 # Drop and recreate database using trust authentication
 log_info "Dropping and recreating database..."
 kubectl exec "${POSTGRES_POD}" -n "${NAMESPACE}" -- \
@@ -252,14 +263,14 @@ else
     log_warning "No signing keys found in backup, skipping"
 fi
 
-# 5. Restart Synapse to apply changes
-log_info "Restarting Synapse to apply restored configuration..."
-kubectl rollout restart deployment -n "${NAMESPACE}" -l app.kubernetes.io/component=synapse
+# 5. Scale Synapse back up
+log_info "Scaling Synapse back up..."
+kubectl scale deployment -n "${NAMESPACE}" -l app.kubernetes.io/component=synapse --replicas=1
 
 log_info "Waiting for Synapse to be ready..."
-kubectl rollout status deployment -n "${NAMESPACE}" -l app.kubernetes.io/component=synapse --timeout=300s
+kubectl wait --for=condition=ready pod -n "${NAMESPACE}" -l app.kubernetes.io/component=synapse --timeout=300s
 
-log_success "Synapse restarted successfully"
+log_success "Synapse started successfully"
 
 # Print summary
 echo ""
