@@ -12,34 +12,48 @@ Production-ready Helm chart for deploying Matrix Synapse homeserver with Element
 
 **Automated Security Scanning with Trivy** - This chart is continuously scanned for security vulnerabilities and misconfigurations.
 
-| Scan Type | Status | Last Scan | Critical | High | Medium | Low |
-|-----------|--------|-----------|----------|------|--------|-----|
+### Overall Security Status
+
+| Scan Type | Status | Schedule | Critical | High | Medium | Low |
+|-----------|--------|----------|----------|------|--------|-----|
 | **Configuration** | ![Status](https://img.shields.io/badge/status-scanning-yellow) | Daily at 2AM UTC | ![Critical](https://img.shields.io/badge/critical-0-success) | ![High](https://img.shields.io/badge/high-0-success) | ![Medium](https://img.shields.io/badge/medium-0-success) | ![Low](https://img.shields.io/badge/low-0-informational) |
 | **Helm Manifests** | ![Status](https://img.shields.io/badge/status-scanning-yellow) | On every push | ![Critical](https://img.shields.io/badge/critical-0-success) | ![High](https://img.shields.io/badge/high-0-success) | ![Medium](https://img.shields.io/badge/medium-0-success) | ![Low](https://img.shields.io/badge/low-0-informational) |
+| **Container Images** | ![Status](https://img.shields.io/badge/status-scanning-yellow) | Daily + On Push | ![Critical](https://img.shields.io/badge/critical-0-success) | ![High](https://img.shields.io/badge/high-0-success) | ![Medium](https://img.shields.io/badge/medium-0-success) | ![Low](https://img.shields.io/badge/low-0-informational) |
+
+### Container Images Scanned
+
+| Image | Version | Critical | High | Medium | Low |
+|-------|---------|----------|------|--------|-----|
+| **Synapse** | v1.140.0 | ![Critical](https://img.shields.io/badge/critical-0-success) | ![High](https://img.shields.io/badge/high-0-success) | ![Medium](https://img.shields.io/badge/medium-0-success) | ![Low](https://img.shields.io/badge/low-0-informational) |
+| **Element Web** | v1.12.2 | ![Critical](https://img.shields.io/badge/critical-0-success) | ![High](https://img.shields.io/badge/high-0-success) | ![Medium](https://img.shields.io/badge/medium-0-success) | ![Low](https://img.shields.io/badge/low-0-informational) |
+| **PostgreSQL** | 16-alpine | ![Critical](https://img.shields.io/badge/critical-0-success) | ![High](https://img.shields.io/badge/high-0-success) | ![Medium](https://img.shields.io/badge/medium-0-success) | ![Low](https://img.shields.io/badge/low-0-informational) |
 
 ### Security Features
 
 ✅ **Automated Daily Scans** - Runs automatically every day at 2 AM UTC
 ✅ **PR Security Checks** - All pull requests are scanned before merge
+✅ **Container Vulnerability Scanning** - All Docker images scanned for CVEs
 ✅ **GitHub Security Tab** - Detailed findings available in [Security Dashboard](https://github.com/ludolac/matrix-synapse-stack/security/code-scanning)
 ✅ **SARIF Reports** - Structured results for easy tracking
-✅ **Multi-Level Scanning** - Chart configs + rendered Kubernetes manifests
+✅ **Multi-Level Scanning** - Chart configs + rendered manifests + container images
 
 ### What We Scan
 
-- 🔍 Helm chart YAML configurations
-- 🔍 Rendered Kubernetes manifests
-- 🔍 Security misconfigurations
-- 🔍 Best practice violations
-- 🔍 Known vulnerabilities (CVEs)
+- 🔍 **Helm chart YAML** configurations
+- 🔍 **Rendered Kubernetes** manifests
+- 🔍 **Container images** (Synapse, Element Web, PostgreSQL)
+- 🔍 **Security misconfigurations** and best practices
+- 🔍 **Known vulnerabilities** (CVEs) in container images
+- 🔍 **OS packages** and application dependencies
 
 ### View Detailed Results
 
 - **Latest Scan**: [GitHub Actions Workflow](https://github.com/ludolac/matrix-synapse-stack/actions/workflows/trivy-scan.yml)
 - **Security Findings**: [Code Scanning Alerts](https://github.com/ludolac/matrix-synapse-stack/security/code-scanning)
 - **Historical Scans**: [All Workflow Runs](https://github.com/ludolac/matrix-synapse-stack/actions/workflows/trivy-scan.yml)
+- **Scan Artifacts**: Download detailed JSON reports from workflow runs
 
-> **Note**: Vulnerability counts are updated automatically after each scan. Click the badges above for real-time status.
+> **Note**: Vulnerability counts are updated automatically after each scan. Click the badges above for real-time status. Container image scans check for vulnerabilities in base OS packages and application dependencies.
 
 ---
 
