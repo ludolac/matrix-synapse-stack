@@ -230,7 +230,24 @@ kubectl exec "${POSTGRES_POD}" -n "${NAMESPACE}" -- rm /tmp/synapse-backup.sql
 
 log_success "Database restored successfully"
 
-# 3. Restore Media Store
+# 3. Scale Synapse back up (before restoring media/keys)
+log_info "Scaling Synapse back up..."
+kubectl scale deployment -n "${NAMESPACE}" -l app.kubernetes.io/component=synapse --replicas=1
+
+log_info "Waiting for Synapse to be ready..."
+kubectl wait --for=condition=ready pod -n "${NAMESPACE}" -l app.kubernetes.io/component=synapse --timeout=300s
+
+# Get the new Synapse pod name
+SYNAPSE_POD=$(kubectl get pod -n "${NAMESPACE}" -l app.kubernetes.io/component=synapse -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+
+if [ -z "$SYNAPSE_POD" ]; then
+    log_error "Synapse pod not found after scaling up"
+    exit 1
+fi
+
+log_success "Synapse started successfully: ${SYNAPSE_POD}"
+
+# 4. Restore Media Store
 if [ -f "${BACKUP_PATH}/media/media-store.tar.gz" ]; then
     log_info "Restoring media store..."
 
@@ -250,7 +267,7 @@ else
     log_warning "No media store backup found, skipping"
 fi
 
-# 4. Restore Signing Keys
+# 5. Restore Signing Keys
 SIGNING_KEY=$(ls "${BACKUP_PATH}/keys/"*.signing.key 2>/dev/null | head -n 1)
 if [ -n "$SIGNING_KEY" ]; then
     log_info "Restoring signing keys..."
@@ -263,14 +280,14 @@ else
     log_warning "No signing keys found in backup, skipping"
 fi
 
-# 5. Scale Synapse back up
-log_info "Scaling Synapse back up..."
-kubectl scale deployment -n "${NAMESPACE}" -l app.kubernetes.io/component=synapse --replicas=1
+# 6. Restart Synapse to load restored files
+log_info "Restarting Synapse to apply changes..."
+kubectl rollout restart deployment -n "${NAMESPACE}" -l app.kubernetes.io/component=synapse
 
 log_info "Waiting for Synapse to be ready..."
-kubectl wait --for=condition=ready pod -n "${NAMESPACE}" -l app.kubernetes.io/component=synapse --timeout=300s
+kubectl rollout status deployment -n "${NAMESPACE}" -l app.kubernetes.io/component=synapse --timeout=300s
 
-log_success "Synapse started successfully"
+log_success "Synapse restarted successfully"
 
 # Print summary
 echo ""
