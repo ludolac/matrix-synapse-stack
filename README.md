@@ -3,7 +3,8 @@
 Production-ready Helm chart for deploying Matrix Synapse homeserver with Element Web client on Kubernetes.
 
 [![Helm Chart](https://img.shields.io/badge/helm-chart-blue)](https://ludolac.github.io/matrix-synapse-stack/)
-[![Chart Version](https://img.shields.io/github/v/release/ludolac/matrix-synapse-stack?label=chart%20version)](https://github.com/ludolac/matrix-synapse-stack/releases)
+[![Release](https://img.shields.io/github/v/release/ludolac/matrix-synapse-stack)](https://github.com/ludolac/matrix-synapse-stack/releases)
+[![Chart Version](https://img.shields.io/badge/dynamic/yaml?url=https://raw.githubusercontent.com/ludolac/matrix-synapse-stack/main/Chart.yaml&query=$.version&label=chart&color=blue)](Chart.yaml)
 [![Synapse Version](https://img.shields.io/badge/synapse-v1.140.0-green)](https://github.com/element-hq/synapse)
 
 ## Installation
@@ -39,7 +40,7 @@ See the [Installation](#installation) section for detailed instructions.
 ✅ **PostgreSQL 16** - Reliable database backend  
 ✅ **Automated Secret Management** - Scripts for credential generation  
 ✅ **Admin User Creation** - Post-install job creates admin automatically  
-✅ **Ingress Support** - NGINX ingress with TLS  
+✅ **Ingress Support** - traefik ingress with TLS  
 ✅ **Persistent Storage** - Longhorn/PVC for data persistence  
 ✅ **Metrics & Monitoring** - Prometheus metrics enabled  
 ✅ **Production Ready** - Tested configuration with best practices  
@@ -53,7 +54,7 @@ See the [Installation](#installation) section for detailed instructions.
 - **Kubernetes Cluster**: v1.24+
 - **Helm**: v3.8+
 - **kubectl**: Configured for your cluster
-- **Ingress Controller**: NGINX (with cert-manager for TLS)
+- **Ingress Controller**: traefik (with cert-manager for TLS)
 - **Storage Class**: Dynamic provisioning (Longhorn, NFS, etc.)
 
 ### Resources
@@ -186,7 +187,7 @@ kubectl create namespace matrix
 kubectl get storageclass
 
 # Verify ingress controller is running
-kubectl get pods -n ingress-nginx
+kubectl get pods -n traefik
 ```
 
 #### Step 3: Download and Customize Values
@@ -250,7 +251,7 @@ kubectl create namespace matrix
 kubectl get storageclass
 
 # Verify ingress controller is running
-kubectl get pods -n ingress-nginx
+kubectl get pods -n traefik
 ```
 
 ### Step 2: Generate Secrets
@@ -447,7 +448,7 @@ synapse:
 synapse:
   ingress:
     enabled: true
-    className: "nginx"
+    className: "traefik"
     hostname: "matrix.example.com"
     annotations:
       cert-manager.io/cluster-issuer: "letsencrypt-prod"
@@ -458,7 +459,7 @@ synapse:
 element:
   ingress:
     enabled: true
-    className: "nginx"
+    className: "traefik"
     hostname: "element.example.com"
     annotations:
       cert-manager.io/cluster-issuer: "letsencrypt-prod"
@@ -759,7 +760,7 @@ kubectl exec deployment/matrix-synapse-synapse -n matrix -- \
 kubectl get ingress -n matrix
 
 # Check ingress controller logs
-kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller
+kubectl logs -n traefik -l app.kubernetes.io/component=controller
 
 # Verify DNS
 nslookup matrix.example.com
