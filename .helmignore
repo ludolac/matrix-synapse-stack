@@ -1,0 +1,79 @@
+# Patterns to ignore when building packages.
+# This supports shell glob matching, relative path matching, and
+# negation (prefixed with !). Only one pattern per line.
+
+# Common VCS dirs
+.git/
+.gitignore
+.bzr/
+.bzrignore
+.hg/
+.hgignore
+.svn/
+
+# Common backup files
+*.swp
+*.bak
+*.tmp
+*.backup
+*~
+.DS_Store
+
+# Documentation and guides (not needed in package)
+*.md
+!Chart.yaml
+!values.yaml
+!values-prod.yaml
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# Scripts (not needed in Helm package)
+scripts/
+*.sh
+
+# Backup and secrets directories
+.backup/
+.secrets/
+backup-*/
+
+# Test files
+test/
+tests/
+*_test.yaml
+
+# IDE and editor files
+.vscode/
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+*.sublime-*
+
+# OS files
+Thumbs.db
+
+# Temporary files
+*.orig
+*.rej
+
+# Production values file (use your own, don't package it)
+values-prod.yaml
+values-prod.yaml.bak
+values-prod.yaml.backup
+
+# Other Helm charts
+charts/
+*.tgz
+
+# License and readme (already in Chart.yaml metadata)
+LICENSE
+README.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+CHANGELOG.md
+SECURITY.md
