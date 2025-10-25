@@ -220,12 +220,13 @@ list_users() {
     TOKEN_RESPONSE=$(kubectl exec deployment/${RELEASE_NAME}-synapse -n ${NAMESPACE} -- \
         curl -s -X POST http://localhost:8008/_matrix/client/r0/login \
         -H "Content-Type: application/json" \
-        -d "{\"type\":\"m.login.password\",\"user\":\"${ADMIN_USER}\",\"password\":\"${ADMIN_PASS}\"}" 2>/dev/null)
+        -d "{\"type\":\"m.login.password\",\"user\":\"${ADMIN_USER}\",\"password\":\"${ADMIN_PASS}\"}" 2>&1)
 
-    ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+    ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4 || true)
 
     if [ -z "$ACCESS_TOKEN" ]; then
         print_error "Failed to authenticate. Check admin credentials."
+        print_error "Response: ${TOKEN_RESPONSE}"
         exit 1
     fi
 
@@ -364,12 +365,13 @@ delete_user() {
     TOKEN_RESPONSE=$(kubectl exec deployment/${RELEASE_NAME}-synapse -n ${NAMESPACE} -- \
         curl -s -X POST http://localhost:8008/_matrix/client/r0/login \
         -H "Content-Type: application/json" \
-        -d "{\"type\":\"m.login.password\",\"user\":\"${ADMIN_USER}\",\"password\":\"${ADMIN_PASS}\"}" 2>/dev/null)
+        -d "{\"type\":\"m.login.password\",\"user\":\"${ADMIN_USER}\",\"password\":\"${ADMIN_PASS}\"}" 2>&1)
 
-    ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+    ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4 || true)
 
     if [ -z "$ACCESS_TOKEN" ]; then
         print_error "Failed to authenticate. Check admin credentials."
+        print_error "Response: ${TOKEN_RESPONSE}"
         exit 1
     fi
 
@@ -491,12 +493,13 @@ update_password() {
     TOKEN_RESPONSE=$(kubectl exec deployment/${RELEASE_NAME}-synapse -n ${NAMESPACE} -- \
         curl -s -X POST http://localhost:8008/_matrix/client/r0/login \
         -H "Content-Type: application/json" \
-        -d "{\"type\":\"m.login.password\",\"user\":\"${ADMIN_USER}\",\"password\":\"${ADMIN_PASS}\"}" 2>/dev/null)
+        -d "{\"type\":\"m.login.password\",\"user\":\"${ADMIN_USER}\",\"password\":\"${ADMIN_PASS}\"}" 2>&1)
 
-    ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+    ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4 || true)
 
     if [ -z "$ACCESS_TOKEN" ]; then
         print_error "Failed to authenticate. Check admin credentials."
+        print_error "Response: ${TOKEN_RESPONSE}"
         exit 1
     fi
 
@@ -626,12 +629,13 @@ deactivate_user() {
     TOKEN_RESPONSE=$(kubectl exec deployment/${RELEASE_NAME}-synapse -n ${NAMESPACE} -- \
         curl -s -X POST http://localhost:8008/_matrix/client/r0/login \
         -H "Content-Type: application/json" \
-        -d "{\"type\":\"m.login.password\",\"user\":\"${ADMIN_USER}\",\"password\":\"${ADMIN_PASS}\"}" 2>/dev/null)
+        -d "{\"type\":\"m.login.password\",\"user\":\"${ADMIN_USER}\",\"password\":\"${ADMIN_PASS}\"}" 2>&1)
 
-    ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+    ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4 || true)
 
     if [ -z "$ACCESS_TOKEN" ]; then
         print_error "Failed to authenticate. Check admin credentials."
+        print_error "Response: ${TOKEN_RESPONSE}"
         exit 1
     fi
 
@@ -679,18 +683,26 @@ get_admin_access() {
 
     if [ -z "$ADMIN_USER" ] || [ -z "$ADMIN_PASS" ]; then
         print_error "Could not retrieve admin credentials!"
+        print_error "Namespace: ${NAMESPACE}, Release: ${RELEASE_NAME}"
         exit 1
     fi
+
+    # Debug: print what we're trying
+    echo "DEBUG: Connecting to deployment/${RELEASE_NAME}-synapse in namespace ${NAMESPACE}"
 
     TOKEN_RESPONSE=$(kubectl exec deployment/${RELEASE_NAME}-synapse -n ${NAMESPACE} -- \
         curl -s -X POST http://localhost:8008/_matrix/client/r0/login \
         -H "Content-Type: application/json" \
-        -d "{\"type\":\"m.login.password\",\"user\":\"${ADMIN_USER}\",\"password\":\"${ADMIN_PASS}\"}" 2>/dev/null)
+        -d "{\"type\":\"m.login.password\",\"user\":\"${ADMIN_USER}\",\"password\":\"${ADMIN_PASS}\"}" 2>&1) || {
+        print_error "Failed to execute kubectl command"
+        exit 1
+    }
 
-    ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+    ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4 || true)
 
     if [ -z "$ACCESS_TOKEN" ]; then
         print_error "Failed to authenticate. Check admin credentials."
+        print_error "Response: ${TOKEN_RESPONSE}"
         exit 1
     fi
 }
