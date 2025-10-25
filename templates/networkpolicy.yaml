@@ -85,6 +85,10 @@ spec:
           port: 443
         - protocol: TCP
           port: 8448
+    # Allow HTTP for URL previews (some sites use HTTP redirects to HTTPS)
+    - ports:
+        - protocol: TCP
+          port: 80
     {{- if .Values.synapse.server.email.enabled }}
     # Allow SMTP for email
     - to:

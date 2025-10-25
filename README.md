@@ -90,11 +90,12 @@ See the [Installation](#installation) section for detailed instructions.
 ✅ **Element Web** v1.12.2 - Modern web client
 ✅ **PostgreSQL 16** - Reliable database backend
 ✅ **Coturn TURN Server** - Integrated WebRTC support for video/voice calls
+✅ **URL Previews** - Rich link previews with OpenGraph metadata
 ✅ **Automated Secret Management** - Scripts for credential generation
 ✅ **Admin User Creation** - Post-install job creates admin automatically
 ✅ **Ingress Support** - traefik ingress with TLS
 ✅ **Persistent Storage** - Longhorn/PVC for data persistence
-✅ **Security Hardened** - Network policies, pod security, secret management
+✅ **Security Hardened** - Network policies, pod security, secret management, SSRF protection
 ✅ **Metrics & Monitoring** - Prometheus metrics enabled
 ✅ **Production Ready** - Tested configuration with best practices  
 

@@ -70,15 +70,27 @@ data:
     url_preview_enabled: {{ .Values.synapse.server.urlPreviews.enabled }}
     {{- if .Values.synapse.server.urlPreviews.enabled }}
     url_preview_ip_range_blacklist:
-      - '127.0.0.0/8'
-      - '10.0.0.0/8'
-      - '172.16.0.0/12'
-      - '192.168.0.0/16'
-      - '100.64.0.0/10'
-      - '169.254.0.0/16'
-      - '::1/128'
-      - 'fe80::/64'
-      - 'fc00::/7'
+      # Block private/internal networks for SSRF protection
+      - '127.0.0.0/8'      # Localhost
+      - '10.0.0.0/8'       # Private networks
+      - '172.16.0.0/12'    # Private networks
+      - '192.168.0.0/16'   # Private networks
+      - '100.64.0.0/10'    # Carrier-grade NAT
+      - '192.0.0.0/24'     # IETF Protocol Assignments
+      - '169.254.0.0/16'   # Link-local
+      - '192.88.99.0/24'   # IPv6 to IPv4 relay
+      - '198.18.0.0/15'    # Benchmarking
+      - '192.0.2.0/24'     # Documentation
+      - '198.51.100.0/24'  # Documentation
+      - '203.0.113.0/24'   # Documentation
+      - '224.0.0.0/4'      # Multicast
+      - '::1/128'          # IPv6 localhost
+      - 'fe80::/10'        # IPv6 link-local
+      - 'fc00::/7'         # IPv6 unique local
+      - '2001:db8::/32'    # IPv6 documentation
+      - 'ff00::/8'         # IPv6 multicast
+      - 'fec0::/10'        # IPv6 site-local (deprecated)
+    max_spider_size: 10M  # Maximum size of content to download for previews
     {{- end }}
 
     # TURN server configuration
@@ -271,40 +283,6 @@ data:
       failed_attempts:
         per_second: 0.5
         burst_count: 10
-
-    # URL Preview Configuration
-    # Enable rich link previews for URLs shared in messages
-    url_preview_enabled: true
-    url_preview_ip_range_blacklist:
-      # Block private/internal networks for security
-      - '127.0.0.0/8'
-      - '10.0.0.0/8'
-      - '172.16.0.0/12'
-      - '192.168.0.0/16'
-      - '100.64.0.0/10'
-      - '192.0.0.0/24'
-      - '169.254.0.0/16'
-      - '192.88.99.0/24'
-      - '198.18.0.0/15'
-      - '192.0.2.0/24'
-      - '198.51.100.0/24'
-      - '203.0.113.0/24'
-      - '224.0.0.0/4'
-      - '::1/128'
-      - 'fe80::/10'
-      - 'fc00::/7'
-      - '2001:db8::/32'
-      - 'ff00::/8'
-      - 'fec0::/10'
-
-    # URL preview limits
-    max_spider_size: 10M  # Maximum size of content to download for previews
-    url_preview_url_blacklist:
-      # Block common tracking/analytics domains if needed
-      # - username: "*"
-      #   netloc: "google-analytics.com"
-      # - username: "*"
-      #   netloc: "*.google-analytics.com"
 
     # Logging configuration - write to console instead of file
     log_config: "/config/log.config.yaml"

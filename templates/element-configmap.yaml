@@ -37,7 +37,12 @@ data:
         "{{ .Values.element.config.defaultServerUrl }}": true
       },
       "setting_defaults": {
-        "breadcrumbs": true
+        "breadcrumbs": true,
+        "UIFeature.urlPreviews": true,
+        "urlPreviewsEnabled": true
+      },
+      "features": {
+        "feature_url_previews": "enable"
       },
       "jitsi": {
         "preferred_domain": "meet.jit.si"

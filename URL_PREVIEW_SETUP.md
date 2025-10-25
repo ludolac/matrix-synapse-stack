@@ -3,73 +3,73 @@
 ## Current Status
 
 ✅ **Configuration Added** - URL preview settings committed to chart
-⏳ **Not Yet Applied** - Need to upgrade Helm deployment
-🔒 **Rate Limited** - Too many test authentications (wait ~3 min or upgrade)
+✅ **Deployed** - Helm chart upgraded successfully
+✅ **NetworkPolicy Fixed** - HTTP/HTTPS egress enabled for URL fetching
+✅ **Ready to Test** - Configuration active in Synapse
 
-## Step 1: Upgrade Helm Deployment
+## Verification Commands
 
 ```bash
-# 1. Bump chart version
-sed -i 's/version: 1.4.8/version: 1.4.9/' Chart.yaml
-
-# 2. Upgrade the deployment
-helm upgrade matrix-synapse . -n matrix -f values-prod.yaml
-
-# 3. Wait for rollout
-kubectl rollout status deployment/matrix-synapse-synapse -n matrix
-
-# 4. Verify configuration
+# 1. Verify configuration in pod
 kubectl exec deployment/matrix-synapse-synapse -n matrix -- \
   cat /config/homeserver-override.yaml | grep -A 35 "url_preview"
+
+# 2. Check NetworkPolicy allows outbound HTTP/HTTPS
+kubectl get networkpolicy matrix-synapse-synapse -n matrix -o yaml | grep -A 30 "egress:"
+
+# 3. Verify Synapse is running
+kubectl get pods -n matrix -l app.kubernetes.io/component=synapse
 ```
 
-## Step 2: Verify URL Previews Are Enabled
+## How to Test URL Previews
 
-```bash
-# Check Synapse logs for URL preview initialization
-kubectl logs deployment/matrix-synapse-synapse -n matrix | grep -i preview
+URL previews work automatically once configured. No API testing needed - just use Element Web!
 
-# Test the API endpoint (after rate limit clears)
-# The script will tell you to wait if rate limited
-bash /tmp/test_url_preview.sh
-```
+## Testing in Element Client
 
-Expected output:
-```json
-{
-  "og:title": "GitHub: Let's build from here",
-  "og:description": "GitHub is where...",
-  "og:image": "https://github.githubassets.com/...",
-  "matrix:image:size": 123456
-}
-```
-
-## Step 3: Test in Element Client
-
+### Step 1: Enable URL Previews in User Settings
 1. **Open Element Web** (https://element.waadoo.ovh)
-2. **Go to any room**
-3. **Send a link** to a public website, e.g.:
+2. Click your avatar → **All settings**
+3. Go to **Preferences** tab
+4. Scroll to **Timeline** section
+5. Enable:
+   - ✅ **"Show previews for links in messages"**
+   - ✅ **"Show inline URL previews"**
+
+### Step 2: Enable URL Previews in Room Settings
+1. **Go to any room**
+2. Click room name → **Settings**
+3. Go to **General** tab
+4. Enable:
+   - ✅ **"Enable URL previews for this room"**
+
+### Step 3: Test with a Link
+1. **Send a link** to a public website in that room:
    - `https://github.com`
-   - `https://youtube.com/watch?v=...`
-   - `https://twitter.com/...`
+   - `https://youtube.com`
+   - `https://reddit.com`
    - `https://news.ycombinator.com`
 
-4. **Wait a moment** - Preview should appear below the message with:
+2. **Wait 2-5 seconds** - Preview should appear below the message with:
    - Page title
    - Description
    - Image/thumbnail (if available)
+
+**Note**: URL previews are **per-room settings**. You must enable them in each room where you want previews to appear.
 
 ## Troubleshooting
 
 ### Issue: No previews appear
 
-**Check 1: Room Settings**
-- In Element: Room Settings → Security & Privacy
-- Ensure "Enable URL previews for this room" is ON
+**Check 1: User Settings**
+- Element Settings → Preferences → Timeline section
+- Enable "Show previews for links in messages"
+- Enable "Show inline URL previews"
 
-**Check 2: User Settings**
-- Element Settings → Preferences → Show previews for links: ON
-- Element Settings → Preferences → Show inline URL previews: ON
+**Check 2: Room Settings** ⚠️ **IMPORTANT**
+- In Element: Room Settings → **General** tab (NOT Security & Privacy!)
+- Enable "Enable URL previews for this room"
+- You must do this **for each room** where you want previews
 
 **Check 3: Server Configuration**
 ```bash
@@ -169,15 +169,55 @@ url_preview_ip_range_whitelist:
 
 ## Quick Test Checklist
 
-- [ ] Helm chart upgraded to 1.4.9
-- [ ] Synapse pods restarted
-- [ ] Rate limit cleared (wait 3-5 minutes)
-- [ ] URL preview config verified in pod
-- [ ] Element room settings: URL previews ON
-- [ ] Element user settings: Show previews ON
+- [x] Helm chart upgraded to 1.4.12
+- [x] NetworkPolicy updated to allow HTTP/HTTPS egress
+- [x] Synapse pods running
+- [x] URL preview config verified in pod (no duplicates)
+- [x] Element Web config includes URL preview defaults
+- [ ] Element user settings: Enable "Show previews for links" (Settings → Preferences → Timeline)
+- [ ] Element room settings: Enable "Enable URL previews for this room" (Room Settings → **General** tab)
 - [ ] Test with public URL (github.com, youtube.com, etc.)
 - [ ] Preview appears in ~2-5 seconds
 
 ---
 
-**Status**: Configuration ready, waiting for Helm upgrade to apply changes.
+## What Was Fixed
+
+### Issue 1: NetworkPolicy blocking outbound connections
+**Problem**: NetworkPolicy was blocking HTTP connections needed for URL preview fetching.
+
+**Solution**: Updated NetworkPolicy template (`templates/networkpolicy.yaml`) to allow:
+- Port 80 (HTTP) - for sites that use HTTP-to-HTTPS redirects
+- Port 443 (HTTPS) - for fetching preview metadata
+- No `to:` selector - allows egress to any external destination
+
+### Issue 2: Duplicate URL preview configuration
+**Problem**: `url_preview_enabled` was defined twice in `synapse-configmap.yaml`:
+- Line 70: Conditional configuration (respects values.yaml)
+- Line 277: Hardcoded configuration (always enabled)
+
+This duplication could cause config parsing issues or override intended settings.
+
+**Solution**:
+- Removed duplicate hardcoded section (lines 275-307)
+- Enhanced primary configuration with complete IP blacklist and `max_spider_size`
+- Single source of truth now respects values.yaml settings
+
+### Issue 3: Element Web missing URL preview defaults
+**Problem**: Element config didn't enable URL previews by default for new users.
+
+**Solution**: Added to `element-configmap.yaml`:
+```json
+"setting_defaults": {
+  "urlPreviewsEnabled": true,
+  "UIFeature.urlPreviews": true
+}
+```
+
+**Chart Versions**:
+- v1.4.10: NetworkPolicy fix
+- v1.4.11: Configuration deduplication + Element defaults
+
+---
+
+**Status**: ✅ URL previews are fully configured and ready to use!
