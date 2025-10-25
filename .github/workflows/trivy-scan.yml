@@ -92,6 +92,9 @@ jobs:
           - name: postgresql
             repo: postgres
             tag: 16-alpine
+          - name: coturn
+            repo: coturn/coturn
+            tag: 4.6-alpine
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -305,6 +308,21 @@ jobs:
             IMAGE_TABLE="${IMAGE_TABLE}| **PostgreSQL** | 16-alpine | ${CRIT_BADGE} | ${HIGH_BADGE} | ${MED_BADGE} | ${LOW_BADGE} |\n"
           fi
 
+          # Process coturn image
+          if [ -f "image-scans/trivy-coturn-reports/trivy-coturn.json" ]; then
+            CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' image-scans/trivy-coturn-reports/trivy-coturn.json 2>/dev/null || echo 0)
+            HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' image-scans/trivy-coturn-reports/trivy-coturn.json 2>/dev/null || echo 0)
+            MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' image-scans/trivy-coturn-reports/trivy-coturn.json 2>/dev/null || echo 0)
+            LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' image-scans/trivy-coturn-reports/trivy-coturn.json 2>/dev/null || echo 0)
+
+            CRIT_BADGE="[![Critical](https://img.shields.io/badge/critical-${CRIT}-$([ ${CRIT} -eq 0 ] && echo 'success' || echo 'critical'))](https://github.com/${REPO}/actions/runs/${RUN_ID})"
+            HIGH_BADGE="[![High](https://img.shields.io/badge/high-${HIGH}-$([ ${HIGH} -eq 0 ] && echo 'success' || echo 'important'))](https://github.com/${REPO}/actions/runs/${RUN_ID})"
+            MED_BADGE="[![Medium](https://img.shields.io/badge/medium-${MED}-$([ ${MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID})"
+            LOW_BADGE="[![Low](https://img.shields.io/badge/low-${LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID})"
+
+            IMAGE_TABLE="${IMAGE_TABLE}| **Coturn** | 4.6-alpine | ${CRIT_BADGE} | ${HIGH_BADGE} | ${MED_BADGE} | ${LOW_BADGE} |\n"
+          fi
+
           echo "image_table<<EOF" >> $GITHUB_OUTPUT
           echo -e "$IMAGE_TABLE" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -385,6 +403,11 @@ jobs:
           POSTGRES_MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' image-scans/trivy-postgresql-reports/trivy-postgresql.json 2>/dev/null || echo 0)
           POSTGRES_LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' image-scans/trivy-postgresql-reports/trivy-postgresql.json 2>/dev/null || echo 0)
 
+          COTURN_CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' image-scans/trivy-coturn-reports/trivy-coturn.json 2>/dev/null || echo 0)
+          COTURN_HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' image-scans/trivy-coturn-reports/trivy-coturn.json 2>/dev/null || echo 0)
+          COTURN_MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' image-scans/trivy-coturn-reports/trivy-coturn.json 2>/dev/null || echo 0)
+          COTURN_LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' image-scans/trivy-coturn-reports/trivy-coturn.json 2>/dev/null || echo 0)
+
           # Update README with sed (replace the Overall Security Status table)
           sed -i "/^| \*\*Configuration\*\* |/c\| **Configuration** | ![Status](https://img.shields.io/badge/status-scanned-success) | Daily at 2AM UTC | $CONFIG_CRIT_BADGE | $CONFIG_HIGH_BADGE | $CONFIG_MED_BADGE | $CONFIG_LOW_BADGE |" README.md
           sed -i "/^| \*\*Helm Manifests\*\* |/c\| **Helm Manifests** | ![Status](https://img.shields.io/badge/status-scanned-success) | On every push | $CONFIG_CRIT_BADGE | $CONFIG_HIGH_BADGE | $CONFIG_MED_BADGE | $CONFIG_LOW_BADGE |" README.md
@@ -396,6 +419,8 @@ jobs:
           sed -i "/^| \*\*Element Web\*\* | v1.12.2 |/c\| **Element Web** | v1.12.2 | [![Critical](https://img.shields.io/badge/critical-${ELEMENT_CRIT}-$([ ${ELEMENT_CRIT} -eq 0 ] && echo 'success' || echo 'critical'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![High](https://img.shields.io/badge/high-${ELEMENT_HIGH}-$([ ${ELEMENT_HIGH} -eq 0 ] && echo 'success' || echo 'important'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Medium](https://img.shields.io/badge/medium-${ELEMENT_MED}-$([ ${ELEMENT_MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Low](https://img.shields.io/badge/low-${ELEMENT_LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID}) |" README.md
 
           sed -i "/^| \*\*PostgreSQL\*\* | 16-alpine |/c\| **PostgreSQL** | 16-alpine | [![Critical](https://img.shields.io/badge/critical-${POSTGRES_CRIT}-$([ ${POSTGRES_CRIT} -eq 0 ] && echo 'success' || echo 'critical'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![High](https://img.shields.io/badge/high-${POSTGRES_HIGH}-$([ ${POSTGRES_HIGH} -eq 0 ] && echo 'success' || echo 'important'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Medium](https://img.shields.io/badge/medium-${POSTGRES_MED}-$([ ${POSTGRES_MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Low](https://img.shields.io/badge/low-${POSTGRES_LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID}) |" README.md
+
+          sed -i "/^| \*\*Coturn\*\* | 4.6-alpine |/c\| **Coturn** | 4.6-alpine | [![Critical](https://img.shields.io/badge/critical-${COTURN_CRIT}-$([ ${COTURN_CRIT} -eq 0 ] && echo 'success' || echo 'critical'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![High](https://img.shields.io/badge/high-${COTURN_HIGH}-$([ ${COTURN_HIGH} -eq 0 ] && echo 'success' || echo 'important'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Medium](https://img.shields.io/badge/medium-${COTURN_MED}-$([ ${COTURN_MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Low](https://img.shields.io/badge/low-${COTURN_LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID}) |" README.md
 
           # Show diff
           echo "README changes:"

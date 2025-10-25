@@ -28,6 +28,7 @@ Production-ready Helm chart for deploying Matrix Synapse homeserver with Element
 | **Synapse** | v1.140.0 | [![Critical](https://img.shields.io/badge/critical-4-critical)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/18799763272) | [![High](https://img.shields.io/badge/high-15-important)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/18799763272) | [![Medium](https://img.shields.io/badge/medium-45-orange)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/18799763272) | [![Low](https://img.shields.io/badge/low-86-informational)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/18799763272) |
 | **Element Web** | v1.12.2 | [![Critical](https://img.shields.io/badge/critical-1-critical)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/18799763272) | [![High](https://img.shields.io/badge/high-0-success)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/18799763272) | [![Medium](https://img.shields.io/badge/medium-4-orange)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/18799763272) | [![Low](https://img.shields.io/badge/low-2-informational)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/18799763272) |
 | **PostgreSQL** | 16-alpine | [![Critical](https://img.shields.io/badge/critical-0-success)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/18799763272) | [![High](https://img.shields.io/badge/high-0-success)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/18799763272) | [![Medium](https://img.shields.io/badge/medium-0-success)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/18799763272) | [![Low](https://img.shields.io/badge/low-0-informational)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/18799763272) |
+| **Coturn** | 4.6-alpine | [![Critical](https://img.shields.io/badge/critical-0-success)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/18799763272) | [![High](https://img.shields.io/badge/high-0-success)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/18799763272) | [![Medium](https://img.shields.io/badge/medium-0-success)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/18799763272) | [![Low](https://img.shields.io/badge/low-0-informational)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/18799763272) |
 
 ### Security Features
 
@@ -42,7 +43,7 @@ Production-ready Helm chart for deploying Matrix Synapse homeserver with Element
 
 - 🔍 **Helm chart YAML** configurations
 - 🔍 **Rendered Kubernetes** manifests
-- 🔍 **Container images** (Synapse, Element Web, PostgreSQL)
+- 🔍 **Container images** (Synapse, Element Web, PostgreSQL, Coturn)
 - 🔍 **Security misconfigurations** and best practices
 - 🔍 **Known vulnerabilities** (CVEs) in container images
 - 🔍 **OS packages** and application dependencies
