@@ -584,11 +584,21 @@ NAMESPACE=my-matrix ./scripts/matrix-admin.sh room-list
 2. **URL-encodes** room ID for API compatibility
 3. **Fetches** room state via Admin API (`/_synapse/admin/v1/rooms/<room_id>/state`)
 4. **Fetches** room details via Admin API (`/_synapse/admin/v1/rooms/<room_id>`)
-5. **Fetches** room members via Admin API (`/_synapse/admin/v2/rooms/<room_id>/members`)
+5. **Extracts** room members from state events (m.room.member events)
 6. **Optionally** fetches message history via Client API (--include-messages flag)
 7. **Creates** JSON export file with all data using Python for proper formatting
 8. **Saves** to `.backup/rooms/` by default or custom path
 9. **Displays** export summary with file size and timestamp
+
+**⚠️ Encrypted Room Limitation:**
+Rooms with end-to-end encryption (E2EE) **cannot export message history**:
+- Matrix uses client-side encryption (m.megolm.v1.aes-sha2)
+- Server doesn't have decryption keys
+- Messages in export are encrypted blobs (unusable without keys)
+- Only room metadata (name, topic, members, settings) can be exported
+- This is a Matrix protocol security feature, not a bug
+
+For E2EE rooms, export only captures room configuration and membership.
 
 **Room Import Command:**
 1. **Validates** export file exists and is readable
