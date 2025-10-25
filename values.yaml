@@ -663,9 +663,17 @@ coturn:
   # Tolerations
   tolerations: []
   
+  # Logging configuration
+  logging:
+    # Set logging verbosity level
+    # Options: "verbose" (default - logs everything), "normal" (moderate), "quiet" (errors only)
+    level: "verbose"
+    # Log file destination (stdout for container logs)
+    file: "stdout"
+
   # Affinity
   affinity: {}
-  
+
   # Extra configuration to append to turnserver.conf
   extraConfig: ""
     # Example:

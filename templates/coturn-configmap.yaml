@@ -73,9 +73,15 @@ data:
     denied-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
     denied-peer-ip=fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff
 
-    # Performance and reliability
+    # Logging configuration
+    {{- if eq .Values.coturn.logging.level "verbose" }}
     verbose
-    log-file=stdout
+    {{- else if eq .Values.coturn.logging.level "quiet" }}
+    simple-log
+    {{- end }}
+    {{- if .Values.coturn.logging.file }}
+    log-file={{ .Values.coturn.logging.file }}
+    {{- end }}
 
     # User quota to prevent abuse
     user-quota={{ .Values.coturn.userQuota }}

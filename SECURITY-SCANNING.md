@@ -53,9 +53,13 @@ The GitHub Actions workflow (`.github/workflows/trivy-scan.yml`) automatically:
 ### Benefits
 
 ✅ **No manual version updates** - Update version in `values.yaml` only
+
 ✅ **Always accurate** - Scans match deployed versions
+
 ✅ **Prevents mistakes** - No risk of version mismatch
+
 ✅ **Automated README updates** - Security scan results show correct versions
+
 
 ## Upgrading Image Versions
 
