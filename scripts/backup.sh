@@ -147,9 +147,9 @@ fi
 # 3. Backup Signing Keys
 log_info "Backing up signing keys..."
 
-# Get server name from configmap
-SERVER_NAME=$(kubectl get configmap -n "${NAMESPACE}" matrix-synapse-synapse-config -o yaml 2>/dev/null | \
-    grep "server_name:" | grep -v "^#" | head -1 | awk -F'"' '{print $2}' || echo "")
+# Get server name from configmap (extract from the YAML content)
+SERVER_NAME=$(kubectl get configmap -n "${NAMESPACE}" matrix-synapse-synapse-config -o jsonpath='{.data.homeserver-override\.yaml}' 2>/dev/null | \
+    grep '^server_name:' | sed 's/server_name: *"\(.*\)"/\1/' | head -1 || echo "")
 
 if [ -z "$SERVER_NAME" ]; then
     log_warning "Could not detect server name from config, trying default..."
