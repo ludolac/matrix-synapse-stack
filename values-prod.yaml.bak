@@ -1,0 +1,307 @@
+# Production values for Matrix Synapse
+
+# Secrets configuration
+secrets:
+  # NEVER auto-generate secrets in production
+  autoGenerate: false
+
+# Synapse configuration
+synapse:
+  replicaCount: 1
+
+  image:
+    # Using GitHub Container Registry to avoid Docker Hub rate limits
+    repository: ghcr.io/element-hq/synapse
+    tag: "v1.140.0"
+    pullPolicy: IfNotPresent
+
+  resources:
+    limits:
+      cpu: 4000m
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+
+  server:
+    name: matrix.waadoo.ovh
+    registration:
+      enabled: false
+      allowGuests: false
+      requireEmail: true
+
+    # Admin user configuration
+    adminUser:
+      enabled: true
+      username: "admin"
+      passwordSecret:
+        name: "matrix-admin-credentials"
+        key: "password"
+      registrationSecretSecret:
+        name: "matrix-admin-credentials"
+        key: "registration-secret"
+      # password: "9TUTrS-zsry6k-n!z!7w-8iedC2-TmL6Xp"  # IMPORTANT: Change this!
+      email: "admin@waadoo.ovh"
+      admin: true
+      displayName: "System Administrator"
+      # Generate a secure secret: openssl rand -hex 32
+      # registrationSecret: "7622f6271e03cbef561f9cbebd734bed1e32389ea65787067e8adb1c7339ee2e"
+
+    reportStats: true
+
+    media:
+      maxUploadSize: "100M"
+      maxImagePixels: "64M"
+
+    urlPreviews:
+      enabled: true
+
+    turn:
+      enabled: true
+      uris:
+        - "turn:turn.waadoo.ovh:3478?transport=udp"
+        - "turn:turn.waadoo.ovh:3478?transport=tcp"
+      sharedSecret: ""  # Set via secret
+      userLifetime: "1h"
+
+    email:
+      enabled: true
+      smtpHost: smtp.waadoo.ovh
+      smtpPort: 587
+      smtpUser: matrix-noreply
+      requireTransportSecurity: true
+      notifFrom: "Matrix <matrix@waadoo.ovh>"
+      appName: "Waadoo Matrix"
+
+    # SSO Configuration - Authelia
+    sso:
+      enabled: true
+      oidc:
+        enabled: true
+        providers:
+          - idp_id: authelia
+            idp_name: "Waadoo SSO"
+            idp_icon: "mxc://waadoo.ovh/authelia-icon"
+            discover: true
+            issuer: "https://authelia.waadoo.ovh"
+            client_id: "matrix"
+            client_secret: "CHANGE_ME_MATRIX_CLIENT_SECRET"
+            scopes: ["openid", "profile", "email", "groups"]
+            user_mapping:
+              localpart_template: "{{ user.preferred_username }}"
+              display_name_template: "{{ user.name }}"
+              email_template: "{{ user.email }}"
+            allow_existing_users: true
+
+  database:
+    external: false
+    host: matrix-synapse-postgresql.matrix.svc.cluster.local
+    port: 5432
+    name: synapse_prod
+    user: synapse
+    passwordSecret:
+      name: synapse-db-credentials
+      key: password
+    cpMin: 10
+    cpMax: 20
+
+  persistence:
+    enabled: true
+    storageClassName: "longhorn"
+    accessMode: ReadWriteMany
+    size: 5Gi
+    mountPath: /data
+
+  metrics:
+    enabled: true
+    port: 9090
+
+# Element Web configuration
+element:
+  enabled: true
+
+  image:
+    repository: ghcr.io/element-hq/element-web
+    tag: "v1.12.2"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 2
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+  config:
+    defaultServerName: matrix.waadoo.ovh
+    defaultServerUrl: "https://matrix.waadoo.ovh"
+    brandingUrl: "https://waadoo.ovh"
+    roomDirectory:
+      servers:
+        - matrix.waadoo.ovh
+        - matrix.org
+    welcomeUserId: "@admin:waadoo.ovh"
+    features:
+      showLabsSettings: true
+      enableWidgets: true
+    integrations:
+      enabled: true
+      uiUrl: "https://scalar.vector.im/"
+      restUrl: "https://scalar.vector.im/api"
+      widgetsUrls:
+        - "https://scalar.vector.im/_matrix/integrations/v1"
+        - "https://scalar.vector.im/api"
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "traefik"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    # Security headers middleware removed - was causing 404 errors
+    # traefik.ingress.kubernetes.io/router.middlewares: "default-security-headers@kubernetescrd"
+
+  synapse:
+    host: matrix.waadoo.ovh
+    paths:
+      - path: /
+        pathType: Prefix
+    tls:
+      secretName: matrix-synapse-tls
+
+  element:
+    host: element.waadoo.ovh
+    paths:
+      - path: /
+        pathType: Prefix
+    tls:
+      secretName: matrix-element-tls
+
+  federation:
+    enabled: true
+    annotations:
+      traefik.ingress.kubernetes.io/router.entrypoints: "matrix-federation"
+
+# Autoscaling for Element
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 75
+
+# Affinity for high availability
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - matrix-synapse
+          topologyKey: kubernetes.io/hostname
+
+# Network policy
+# Note: Disabled because egress rules were blocking PostgreSQL connectivity
+# TODO: Fix NetworkPolicy egress rules to properly allow traffic to PostgreSQL
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-traefik
+  egress:
+    # Allow DNS queries to kube-system
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow PostgreSQL connection (same namespace)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: postgresql
+              app.kubernetes.io/instance: matrix-synapse
+              app.kubernetes.io/name: matrix-synapse
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow HTTPS for federation
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 8448
+    # Allow SMTP for email
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 587
+        - protocol: TCP
+          port: 465
+
+# PostgreSQL configuration for production
+postgresql:
+  enabled: true
+
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  database: synapse_prod
+  username: synapse
+  postgresPassword: ""  # Set via secret
+
+  initdbArgs: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
+
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
+    runAsNonRoot: true
+    runAsUser: 999
+
+  persistence:
+    storageClassName: "longhorn"
+    size: 5Gi
+
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+
+  config:
+    maxConnections: 500
+    sharedBuffers: "512MB"
+    effectiveCacheSize: "2GB"
+    maintenanceWorkMem: "128MB"
+    workMem: "16MB"
+    walLevel: "minimal"
+    maxWalSenders: 0
+    logMinDurationStatement: 100

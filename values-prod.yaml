@@ -1,0 +1,377 @@
+# Production values for Matrix Synapse
+
+# Secrets configuration
+secrets:
+  # NEVER auto-generate secrets in production
+  autoGenerate: false
+
+# Synapse configuration
+synapse:
+  replicaCount: 1
+
+  image:
+    # Using GitHub Container Registry to avoid Docker Hub rate limits
+    repository: ghcr.io/element-hq/synapse
+    tag: "v1.140.0"
+    pullPolicy: IfNotPresent
+
+  resources:
+    limits:
+      cpu: 4000m
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+
+  server:
+    name: matrix.waadoo.ovh
+    registration:
+      enabled: false
+      allowGuests: false
+      requireEmail: true
+
+    # Admin user configuration
+    adminUser:
+      enabled: true
+      username: "admin"
+      passwordSecret:
+        name: "matrix-admin-credentials"
+        key: "password"
+      registrationSecretSecret:
+        name: "matrix-admin-credentials"
+        key: "registration-secret"
+      # password: "9TUTrS-zsry6k-n!z!7w-8iedC2-TmL6Xp"  # IMPORTANT: Change this!
+      email: "admin@waadoo.ovh"
+      admin: true
+      displayName: "System Administrator"
+      # Generate a secure secret: openssl rand -hex 32
+      # registrationSecret: "7622f6271e03cbef561f9cbebd734bed1e32389ea65787067e8adb1c7339ee2e"
+
+    reportStats: true
+
+    media:
+      maxUploadSize: "100M"
+      maxImagePixels: "64M"
+
+    urlPreviews:
+      enabled: true
+
+    turn:
+      enabled: false  # Using auto-configured coturn instead
+      uris: []
+      sharedSecret: ""  # Set via secret
+      userLifetime: "1h"
+
+    email:
+      enabled: true
+      smtpHost: smtp.waadoo.ovh
+      smtpPort: 587
+      smtpUser: matrix-noreply
+      requireTransportSecurity: true
+      notifFrom: "Matrix <matrix@waadoo.ovh>"
+      appName: "Waadoo Matrix"
+
+    # Multi-Factor Authentication (2FA/MFA)
+    # Users can enable TOTP via Element Web Settings → Security & Privacy
+    mfa:
+      totp:
+        enabled: true
+        algorithm: "sha1"  # Standard TOTP algorithm
+        digits: 6          # 6-digit codes (standard)
+        period: 30         # Codes valid for 30 seconds
+        issuer: "Waadoo Matrix"  # Name shown in authenticator apps
+
+      webauthn:
+        enabled: false     # Hardware security keys (YubiKey, etc.)
+        # rpId: "matrix.waadoo.ovh"
+        # rpName: "Waadoo Matrix"
+
+    # SSO Configuration - Authelia
+    sso:
+      enabled: true
+      oidc:
+        enabled: true
+        providers:
+          - idp_id: authelia
+            idp_name: "Waadoo SSO"
+            # idp_icon: ""  # Optional: Upload icon to Matrix and use MXC URI here
+            discover: true
+            issuer: "https://authelia.waadoo.ovh"
+            client_id: "matrix"
+            # client_secret is stored in Kubernetes secret: matrix-synapse-sso-credentials
+            # client_secret: ""  # Injected from secret via environment variable
+            allow_existing_users: true
+            scopes: ["openid", "profile", "email", "groups"]
+            user_mapping_provider:
+              config:
+                subject_claim: "sub"
+                localpart_template: "{{ user.preferred_username }}"
+                display_name_template: "{{ user.name }}"
+                email_template: "{{ user.email }}"
+            attribute_requirements:
+              - attribute: 'groups'
+                value: 'synapse-users'
+
+
+
+  database:
+    external: false
+    host: matrix-synapse-postgresql.matrix.svc.cluster.local
+    port: 5432
+    name: synapse_prod
+    user: synapse
+    passwordSecret:
+      name: synapse-db-credentials
+      key: password
+    cpMin: 10
+    cpMax: 20
+
+  persistence:
+    enabled: true
+    storageClassName: "longhorn"
+    accessMode: ReadWriteMany
+    size: 5Gi
+    mountPath: /data
+
+  metrics:
+    enabled: true
+    port: 9090
+
+# Element Web configuration
+element:
+  enabled: true
+
+  image:
+    repository: ghcr.io/element-hq/element-web
+    tag: "v1.12.2"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 2
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+  config:
+    defaultServerName: matrix.waadoo.ovh
+    defaultServerUrl: "https://matrix.waadoo.ovh"
+    brandingUrl: "https://waadoo.ovh"
+    roomDirectory:
+      servers:
+        - matrix.waadoo.ovh
+        - matrix.org
+    welcomeUserId: "@admin:waadoo.ovh"
+    features:
+      showLabsSettings: true
+      enableWidgets: true
+    integrations:
+      enabled: true
+      uiUrl: "https://scalar.vector.im/"
+      restUrl: "https://scalar.vector.im/api"
+      widgetsUrls:
+        - "https://scalar.vector.im/_matrix/integrations/v1"
+        - "https://scalar.vector.im/api"
+
+    # Branding and theming for Element Web
+    branding:
+      # Custom logo URL (appears in auth header)
+      authHeaderLogoUrl: "https://cdn.prod.website-files.com/66cd8b5d239e735499b670dd/66cd8bfaad7a660cf58c8519_logo_big-p-500.png"
+      # Welcome background image (login/register page wallpaper)
+      welcomeBackgroundUrl: "https://images.wallpapersden.com/image/download/starry-landscape-4k-cool-blue-moon_bW5tbG6UmZqaraWkpJRobWllrWdma2U.jpg"
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "traefik"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    # Security headers middleware removed - was causing 404 errors
+    # traefik.ingress.kubernetes.io/router.middlewares: "default-security-headers@kubernetescrd"
+
+  synapse:
+    host: matrix.waadoo.ovh
+    paths:
+      - path: /
+        pathType: Prefix
+    tls:
+      secretName: matrix-synapse-tls
+
+  element:
+    host: element.waadoo.ovh
+    paths:
+      - path: /
+        pathType: Prefix
+    tls:
+      secretName: matrix-element-tls
+
+  federation:
+    # Disabled - using .well-known delegation on port 443 instead
+    # This requires the matrix-federation entrypoint in Traefik (port 8448)
+    enabled: false
+    annotations:
+      traefik.ingress.kubernetes.io/router.entrypoints: "matrix-federation"
+
+# Autoscaling for Element
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 75
+
+# Affinity for high availability
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - matrix-synapse
+          topologyKey: kubernetes.io/hostname
+
+# Network policy configuration
+# Creates separate NetworkPolicies for each component with fine-grained access control
+networkPolicy:
+  enabled: true  # Enable NetworkPolicies for production security
+
+  # Ingress configuration (who can access our pods)
+  ingress:
+    # Traefik ingress controller configuration
+    traefik:
+      # Match the actual Traefik namespace label
+      namespaceSelector:
+        name: traefik
+      # Allow from any Traefik pod (empty selector)
+      podSelector: {}
+
+  # Egress configuration (what our pods can access)
+  egress:
+    # SSO provider configuration (Authelia)
+    sso:
+      # Authelia is in the 'authentif' namespace
+      namespaceSelector:
+        kubernetes.io/metadata.name: authentif
+      # Allow to any pod in Authelia namespace
+      podSelector: {}
+
+# PostgreSQL configuration for production
+postgresql:
+  enabled: true
+
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  database: synapse_prod
+  username: synapse
+  postgresPassword: ""  # Set via secret
+
+  # Password fix job (post-install/post-upgrade hook)
+  # This job updates PostgreSQL password with the value from Kubernetes secret
+  # Generally NOT needed for fresh installs as PostgreSQL initializes with correct password
+  # Only useful for migrating from external databases or password rotation scenarios
+  passwordFixJob:
+    enabled: false  # Disabled by default (not needed for most deployments)
+
+  initdbArgs: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
+
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
+    runAsNonRoot: true
+    runAsUser: 999
+
+  persistence:
+    storageClassName: "longhorn"
+    size: 5Gi
+
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+
+  config:
+    maxConnections: 500
+    sharedBuffers: "512MB"
+    effectiveCacheSize: "2GB"
+    maintenanceWorkMem: "128MB"
+    workMem: "16MB"
+    walLevel: "minimal"
+    maxWalSenders: 0
+    logMinDurationStatement: 100
+
+# Coturn TURN server configuration
+coturn:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: coturn/coturn
+    tag: "4.6-alpine"
+    pullPolicy: IfNotPresent
+
+  # External IP will be resolved from DNS (turn.waadoo.ovh)
+  externalIP: ""
+
+  # Realm for TURN authentication
+  realm: "turn.waadoo.ovh"
+
+  # Relay port range for media traffic
+  relayPortRange:
+    min: 49152
+    max: 49252
+
+  # TLS configuration for TURNS
+  tls:
+    enabled: true
+    secretName: "coturn-tls"
+
+  # Service configuration
+  service:
+    type: LoadBalancer
+    externalDns:
+      enabled: true
+      hostname: "turn.waadoo.ovh"
+      ttl: 300
+
+  # Ingress for HTTPS access (disabled - TURN uses LoadBalancer directly)
+  # Note: TURN uses UDP/TCP protocols, not HTTP. Traefik routing requires
+  # additional entrypoints configuration. See TRAEFIK-TURN-SETUP.md for details.
+  ingress:
+    enabled: false
+    className: "traefik"
+    hostname: "turn.waadoo.ovh"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+      traefik.ingress.kubernetes.io/router.tls: "true"
+    tls:
+      secretName: "coturn-tls"
+
+  # Resource limits
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 128Mi
