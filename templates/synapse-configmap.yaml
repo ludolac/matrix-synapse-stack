@@ -260,13 +260,6 @@ data:
     {{- end }}
     {{- end }}
 
-    # Experimental features for Element Call support
-    experimental_features:
-      # Enable MSC3266: Room summary API (required for Element Call)
-      msc3266_enabled: true
-      # Enable MSC3401: Native Matrix VoIP signaling (required for Element Call)
-      msc3401_enabled: true
-
     # Logging configuration - write to console instead of file
     log_config: "/config/log.config.yaml"
 
