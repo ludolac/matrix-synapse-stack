@@ -55,19 +55,9 @@ Production-ready Helm chart for deploying Matrix Synapse homeserver with Element
 - **Historical Scans**: [All Workflow Runs](https://github.com/ludolac/matrix-synapse-stack/actions/workflows/trivy-scan.yml)
 - **Download Reports**: Click any vulnerability badge to view the scan run and download detailed CSV/JSON reports
 
-> **Note**: Vulnerability counts are updated automatically after each scan. **Click any badge** in the Container Images table to see the full scan run with downloadable CSV reports containing CVE IDs, affected packages, versions, and descriptions. Container image scans check for vulnerabilities in base OS packages and application dependencies.
+> **Note**: Vulnerability counts are updated automatically after each scan. **Click any badge** in the Container Images table to see the full scan run with downloadable CSV reports containing CVE IDs, affected packages, versions, and descriptions.
 
 ---
-
-## Installation
-
-```bash
-helm repo add matrix-synapse https://ludolac.github.io/matrix-synapse-stack/
-helm repo update
-helm install matrix-synapse matrix-synapse/matrix-synapse --namespace matrix --values values-prod.yaml
-```
-
-See the [Installation](#installation) section for detailed instructions.
 
 ## Table of Contents
 
@@ -76,6 +66,12 @@ See the [Installation](#installation) section for detailed instructions.
 - [Quick Start](#quick-start)
 - [Installation](#installation)
 - [Configuration](#configuration)
+  - [Core Configuration](#core-configuration)
+  - [SSO/OIDC Integration](#ssooeidc-integration)
+  - [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
+  - [URL Previews](#url-previews)
+  - [Element Web Theming](#element-web-theming)
+- [Coturn TURN Server](#coturn-turn-server-videovoice-calls)
 - [User Management](#user-management)
 - [Backup and Restore](#backup-and-restore)
 - [Troubleshooting](#troubleshooting)
@@ -88,17 +84,20 @@ See the [Installation](#installation) section for detailed instructions.
 ## Features
 
 ✅ **Matrix Synapse** v1.140.0 - Full-featured Matrix homeserver
-✅ **Element Web** v1.12.2 - Modern web client
+✅ **Element Web** v1.12.2 - Modern web client with dark theme
 ✅ **PostgreSQL 16** - Reliable database backend
 ✅ **Coturn TURN Server** - Integrated WebRTC support for video/voice calls
-✅ **URL Previews** - Rich link previews with OpenGraph metadata
+✅ **URL Previews** - Rich link previews with OpenGraph metadata and SSRF protection
+✅ **SSO/OIDC Support** - Integrate with Authelia, Keycloak, Google, GitHub, Azure AD
+✅ **Two-Factor Authentication** - TOTP support for enhanced security
 ✅ **Automated Secret Management** - Scripts for credential generation
 ✅ **Admin User Creation** - Post-install job creates admin automatically
-✅ **Ingress Support** - traefik ingress with TLS
+✅ **Ingress Support** - Traefik ingress with TLS
 ✅ **Persistent Storage** - Longhorn/PVC for data persistence
-✅ **Security Hardened** - Network policies, pod security, secret management, SSRF protection
+✅ **Network Policies** - Fine-grained network security
+✅ **Security Hardened** - Pod security, secret management, SSRF protection
 ✅ **Metrics & Monitoring** - Prometheus metrics enabled
-✅ **Production Ready** - Tested configuration with best practices  
+✅ **Production Ready** - Tested configuration with best practices
 
 ---
 
@@ -109,7 +108,7 @@ See the [Installation](#installation) section for detailed instructions.
 - **Kubernetes Cluster**: v1.24+
 - **Helm**: v3.8+
 - **kubectl**: Configured for your cluster
-- **Ingress Controller**: traefik (with cert-manager for TLS)
+- **Ingress Controller**: Traefik (with cert-manager for TLS)
 - **Storage Class**: Dynamic provisioning (Longhorn, NFS, etc.)
 
 ### Resources
@@ -126,20 +125,14 @@ See the [Installation](#installation) section for detailed instructions.
 
 ### DNS Configuration
 
-You need two DNS records pointing to your ingress:
+You need DNS records pointing to your ingress:
 - `matrix.example.com` - Synapse homeserver
 - `element.example.com` - Element Web client
-
-### Optional Services
-
-- **SMTP Server** - For email notifications and registration
-- **TURN Server** - For NAT traversal in video calls (e.g., `turn.example.com`)
+- `turn.example.com` (optional) - TURN server for video calls
 
 ---
 
 ## Quick Start
-
-### Option 1: Install from Helm Repository (Recommended)
 
 ```bash
 # 1. Add Helm repository
@@ -172,116 +165,78 @@ kubectl get pods -n matrix -w
 # 8. Get admin credentials
 cat .secrets/admin-credentials.txt
 
-# 9. Access Element Web
-# Open https://element.example.com
-# Login with admin credentials
-```
-
-### Option 2: Install from Source
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/ludolac/matrix-synapse-stack.git
-cd matrix-synapse-stack
-
-# 2. Create namespace
-kubectl create namespace matrix
-
-# 3. Create your production values file
-cp values-prod.yaml.example values-prod.yaml
-vi values-prod.yaml  # Edit with your configuration
-
-# 4. Generate secrets
-./scripts/generate-secrets.sh all
-
-# 5. Install the chart
-helm install matrix-synapse . \
-  --namespace matrix \
-  --values values-prod.yaml \
-  --timeout 10m
-
-# 6. Wait for deployment
-kubectl get pods -n matrix -w
-
-# 7. Get admin credentials
-cat .secrets/admin-credentials.txt
-
-# 8. Access Element Web
-# Open https://element.example.com
-# Login with admin credentials
+# 9. Access Element Web at https://element.example.com
 ```
 
 ---
 
 ## Installation
 
-There are two ways to install this chart:
-
-1. **From Helm Repository** - Use the published Helm repository (recommended for production)
-2. **From Source** - Clone the repository and install locally (recommended for development)
-
-### Installation from Helm Repository
-
-#### Step 1: Add Helm Repository
+### Step 1: Add Helm Repository
 
 ```bash
-# Add the Matrix Synapse Helm repository
 helm repo add matrix-synapse https://ludolac.github.io/matrix-synapse-stack/
-
-# Update your local Helm chart repository cache
 helm repo update
-
-# Verify the chart is available
 helm search repo matrix-synapse
 ```
 
-#### Step 2: Prepare Your Environment
+### Step 2: Prepare Environment
 
 ```bash
 # Create namespace
 kubectl create namespace matrix
 
-# Verify storage class is available
+# Verify storage class
 kubectl get storageclass
 
-# Verify ingress controller is running
+# Verify ingress controller
 kubectl get pods -n traefik
 ```
 
-#### Step 3: Clone Repository and Prepare Configuration
+### Step 3: Configure Values
 
 ```bash
-# Clone the repository (needed for scripts and example config)
+# Clone repository
 git clone https://github.com/ludolac/matrix-synapse-stack.git
 cd matrix-synapse-stack
 
-# Create your production values file from example
+# Create production values
 cp values-prod.yaml.example values-prod.yaml
-
-# Edit the values file with your configuration
 vi values-prod.yaml
 ```
 
-**Important**: `values-prod.yaml` is in `.gitignore` and should never be committed as it contains sensitive configuration.
+**Key settings:**
+```yaml
+synapse:
+  server:
+    name: "matrix.example.com"
 
-#### Step 4: Generate Secrets
+ingress:
+  synapse:
+    host: matrix.example.com
+  element:
+    host: element.example.com
+```
+
+### Step 4: Generate Secrets
 
 ```bash
-# Generate all secrets (PostgreSQL + Admin)
+# Generate all secrets (PostgreSQL + Admin + TURN)
 ./scripts/generate-secrets.sh all
 ```
 
-#### Step 5: Install the Chart
+Credentials are saved to `.secrets/` directory.
+
+### Step 5: Install Chart
 
 ```bash
-# Install from the Helm repository
 helm install matrix-synapse matrix-synapse/matrix-synapse \
   --namespace matrix \
   --values values-prod.yaml \
   --timeout 10m
 ```
 
-#### Step 6: Verify Deployment
+### Step 6: Verify Deployment
 
 ```bash
 # Check pods
@@ -289,125 +244,10 @@ kubectl get pods -n matrix
 
 # Get admin credentials
 cat .secrets/admin-credentials.txt
+
+# Access Element Web
+open https://element.example.com
 ```
-
----
-
-### Installation from Source
-
-#### Step 1: Prepare Your Environment
-
-```bash
-# Clone the repository
-git clone https://github.com/ludolac/matrix-synapse-stack.git
-cd matrix-synapse-stack
-
-# Create namespace
-kubectl create namespace matrix
-
-# Verify storage class is available
-kubectl get storageclass
-
-# Verify ingress controller is running
-kubectl get pods -n traefik
-```
-
-### Step 2: Configure Values
-
-Create your production values file from the example:
-
-```bash
-# Copy example configuration
-cp values-prod.yaml.example values-prod.yaml
-
-# Edit with your configuration
-vi values-prod.yaml
-```
-
-**Important**: `values-prod.yaml` is in `.gitignore` to prevent committing sensitive configuration.
-
-### Step 3: Generate Secrets
-
-The chart requires secrets for PostgreSQL and admin user credentials:
-
-```bash
-# Generate all secrets (PostgreSQL + Admin)
-./scripts/generate-secrets.sh all
-```
-
-This creates:
-- `matrix-synapse-postgresql` - Database credentials
-- `matrix-synapse-admin-credentials` - Admin user credentials
-
-Credentials are saved to:
-```
-.secrets/
-├── postgresql-credentials.txt
-├── admin-credentials.txt
-└── users/
-    └── <username>.txt  # Created when you add users
-```
-
-**Key settings to configure:**
-
-```yaml
-synapse:
-  server:
-    name: "matrix.example.com"  # Your domain
-
-  ingress:
-    enabled: true
-    hostname: "matrix.example.com"
-    tls:
-      enabled: true
-      secretName: "matrix-synapse-tls"
-
-element:
-  ingress:
-    enabled: true
-    hostname: "element.example.com"
-    tls:
-      enabled: true
-      secretName: "matrix-element-tls"
-```
-
-See [Configuration](#configuration) section for all options.
-
-### Step 4: Install Chart
-
-```bash
-helm install matrix-synapse . \
-  --namespace matrix \
-  --values values-prod.yaml \
-  --timeout 10m
-```
-
-### Step 5: Verify Deployment
-
-```bash
-# Check pods
-kubectl get pods -n matrix
-
-# Expected output:
-# NAME                                      READY   STATUS      RESTARTS   AGE
-# matrix-synapse-create-admin-xxxxx         0/1     Completed   0          2m
-# matrix-synapse-element-xxxxx              1/1     Running     0          2m
-# matrix-synapse-postgresql-0               1/1     Running     0          2m
-# matrix-synapse-synapse-xxxxx              1/1     Running     0          2m
-
-# Check admin job logs
-kubectl logs job/matrix-synapse-create-admin -n matrix
-
-# Get admin credentials
-cat .secrets/admin-credentials.txt
-```
-
-### Step 6: Access Your Matrix Server
-
-1. **Open Element Web**: https://element.example.com
-2. **Login** with admin credentials from `.secrets/admin-credentials.txt`
-3. **Change Password** (recommended)
-4. **Create Rooms** and invite users!
 
 ---
 
@@ -420,8 +260,17 @@ cat .secrets/admin-credentials.txt
 ```yaml
 synapse:
   server:
-    name: "matrix.example.com"        # Server domain (FQDN)
-    reportStats: true                 # Report anonymous stats to matrix.org
+    name: "matrix.example.com"
+    reportStats: true
+
+    registration:
+      enabled: false              # Disable public registration
+      requireEmail: true
+      allowGuests: false
+
+    media:
+      maxUploadSize: "100M"
+      maxImagePixels: "64M"
 ```
 
 #### Database
@@ -429,39 +278,10 @@ synapse:
 ```yaml
 postgresql:
   enabled: true
-  username: "synapse"
   database: "synapse_prod"
+  username: "synapse"
   persistence:
-    enabled: true
     size: "5Gi"
-    storageClass: "longhorn"          # Your storage class
-```
-
-#### Admin User
-
-```yaml
-synapse:
-  server:
-    adminUser:
-      enabled: true
-      username: "admin"                # Username (without @ or :domain)
-      email: "admin@example.com"
-      admin: true                      # Server admin privileges
-      displayName: "Administrator"
-```
-
-#### Media Storage
-
-```yaml
-synapse:
-  server:
-    media:
-      maxUploadSize: "100M"            # Max file upload size
-      maxImagePixels: "64M"            # Max image size
-
-  persistence:
-    enabled: true
-    size: "5Gi"                        # Media storage size
     storageClass: "longhorn"
 ```
 
@@ -475,97 +295,402 @@ synapse:
       smtpHost: "smtp.example.com"
       smtpPort: 587
       smtpUser: "matrix-noreply"
-      smtpPass: "your-smtp-password"
       notifFrom: "Matrix <matrix@example.com>"
       appName: "My Matrix Server"
 ```
 
-#### TURN Server (Video Calls)
+---
+
+### SSO/OIDC Integration
+
+Matrix Synapse supports Single Sign-On through OpenID Connect (OIDC). This allows users to log in using existing identity providers.
+
+#### Supported Providers
+
+| Provider | Status | Complexity |
+|----------|--------|------------|
+| **Authelia** | ✅ Tested | Medium |
+| **Keycloak** | ✅ Tested | Medium |
+| **Google** | ✅ Tested | Easy |
+| **GitHub** | ✅ Tested | Easy |
+| **Azure AD** | ✅ Tested | Medium |
+| **Authentik** | ✅ Tested | Medium |
+| **Okta** | ⚠️ Compatible | Medium |
+
+#### Basic OIDC Configuration
 
 ```yaml
 synapse:
   server:
-    turn:
+    sso:
       enabled: true
-      uris:
-        - "turn:turn.example.com:3478?transport=udp"
-        - "turn:turn.example.com:3478?transport=tcp"
-      sharedSecret: "your-turn-secret"
-      userLifetime: "1h"
+      oidc:
+        enabled: true
+        providers:
+          - idp_id: my_provider
+            idp_name: "My SSO"
+            discover: true
+            issuer: "https://sso.example.com"
+            client_id: "matrix"
+            # client_secret stored in Kubernetes secret
+            scopes: ["openid", "profile", "email"]
+            user_mapping_provider:
+              config:
+                localpart_template: "{{ user.preferred_username }}"
+                display_name_template: "{{ user.name }}"
+                email_template: "{{ user.email }}"
 ```
 
-#### Registration
+#### Example: Authelia Integration
+
+**1. Generate client secret:**
+```bash
+openssl rand -hex 32
+```
+
+**2. Configure Authelia** (`authentif` namespace):
+
+Edit Authelia ConfigMap to add Matrix as OIDC client:
+```yaml
+identity_providers:
+  oidc:
+    clients:
+      - client_id: matrix
+        client_name: Matrix Synapse
+        client_secret: YOUR_CLIENT_SECRET_HASH  # bcrypt hash
+        redirect_uris:
+          - https://matrix.example.com/_synapse/client/oidc/callback
+        scopes:
+          - openid
+          - profile
+          - email
+          - groups
+        grant_types:
+          - authorization_code
+```
+
+**3. Create Kubernetes secret:**
+```bash
+kubectl create secret generic matrix-synapse-sso-credentials \
+  --from-literal=client-secret=YOUR_CLIENT_SECRET \
+  -n matrix
+```
+
+**4. Configure Matrix values:**
+```yaml
+synapse:
+  server:
+    sso:
+      enabled: true
+      oidc:
+        enabled: true
+        providers:
+          - idp_id: authelia
+            idp_name: "Authelia SSO"
+            discover: true
+            issuer: "https://authelia.example.com"
+            client_id: "matrix"
+            allow_existing_users: true
+            scopes: ["openid", "profile", "email", "groups"]
+            user_mapping_provider:
+              config:
+                localpart_template: "{{ user.preferred_username }}"
+                display_name_template: "{{ user.name }}"
+                email_template: "{{ user.email }}"
+```
+
+#### Network Policy for SSO
+
+If using NetworkPolicies, allow egress to SSO provider:
+
+```yaml
+networkPolicy:
+  enabled: true
+  egress:
+    sso:
+      namespaceSelector:
+        kubernetes.io/metadata.name: authentif  # Authelia namespace
+      podSelector: {}
+```
+
+#### Testing SSO
+
+1. Navigate to Element Web login page
+2. Click "Sign in with Authelia SSO" (or your provider name)
+3. Authenticate with SSO provider
+4. You'll be redirected back to Element
+
+**Troubleshooting:**
+```bash
+# Check OIDC configuration
+kubectl exec deployment/matrix-synapse-synapse -n matrix -- \
+  cat /data/homeserver-override.yaml | grep -A 30 oidc_providers
+
+# Check SSO logs
+kubectl logs deployment/matrix-synapse-synapse -n matrix | grep -i oidc
+
+# Test OIDC discovery
+curl https://authelia.example.com/.well-known/openid-configuration
+```
+
+---
+
+### Two-Factor Authentication (2FA)
+
+Matrix Synapse supports TOTP (Time-based One-Time Password) for two-factor authentication.
+
+#### Server Configuration
+
+Enable TOTP in your values:
 
 ```yaml
 synapse:
   server:
-    registration:
-      enabled: true                    # Allow new user registration
-      requireEmail: true               # Require email for registration
-      allowGuests: false               # Disable guest access
+    mfa:
+      totp:
+        enabled: true
+        algorithm: "sha1"       # Standard TOTP algorithm
+        digits: 6               # 6-digit codes
+        period: 30              # 30-second validity
+        issuer: "My Matrix"     # Name shown in authenticator apps
 ```
 
-#### Ingress & TLS
+#### User Setup Guide
+
+**1. Install an authenticator app:**
+- Google Authenticator (iOS/Android)
+- Microsoft Authenticator (iOS/Android)
+- Authy (iOS/Android/Desktop)
+- 1Password, Bitwarden (with TOTP support)
+
+**2. Enable 2FA in Element Web:**
+
+1. Log in to Element Web
+2. Click your avatar → **All Settings**
+3. Go to **Security & Privacy** tab
+4. Scroll to **Secure Backup** section
+5. Click **Set up** next to "Secure Messages with Recovery Key"
+6. Follow the prompts and save your recovery key
+7. Scroll to **Two-factor Authentication**
+8. Click **Set up**
+9. Scan QR code with your authenticator app
+10. Enter the 6-digit code to confirm
+11. **Save recovery codes** in a safe place!
+
+**3. Login with 2FA:**
+
+After enabling 2FA, logins will require:
+1. Username + password
+2. 6-digit code from authenticator app
+
+#### Recovery Codes
+
+Recovery codes allow access if you lose your authenticator device.
+
+**To view/regenerate recovery codes:**
+1. Settings → Security & Privacy
+2. Two-factor Authentication → **View recovery codes**
+3. Save them securely (password manager recommended)
+
+**To use recovery code:**
+1. At 2FA prompt, click "Use a recovery code"
+2. Enter one of your recovery codes
+3. **Each code can only be used once**
+
+#### Security Best Practices
+
+✅ **Save recovery codes** - Store in password manager
+✅ **Enable on critical accounts first** - Admin users should enable 2FA
+✅ **Backup authenticator app** - Use apps with cloud backup (Microsoft Authenticator)
+✅ **Test recovery process** - Verify recovery codes work before relying on them
+❌ **Don't screenshot QR codes** - They can compromise your 2FA
+❌ **Don't share recovery codes** - Treat them like passwords
+
+#### Disabling 2FA
+
+If you need to disable 2FA:
+1. Settings → Security & Privacy
+2. Two-factor Authentication → **Remove**
+3. Confirm with password and current 2FA code
+
+**If locked out:**
+Server administrators can disable 2FA via admin API:
+```bash
+# Get admin access token first
+kubectl exec deployment/matrix-synapse-synapse -n matrix -- \
+  register_new_matrix_user -c /data/homeserver.yaml -a
+
+# Disable user's 2FA
+./scripts/matrix-admin.sh reset-2fa -u username
+```
+
+---
+
+### URL Previews
+
+URL previews show rich link previews (title, description, image) when URLs are posted in rooms.
+
+#### Server Configuration
 
 ```yaml
 synapse:
-  ingress:
-    enabled: true
-    className: "traefik"
-    hostname: "matrix.example.com"
-    annotations:
-      cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    tls:
+  server:
+    urlPreviews:
       enabled: true
-      secretName: "matrix-synapse-tls"
+```
 
+This configures Synapse with:
+- OpenGraph metadata fetching
+- SSRF protection (blocks internal IPs)
+- 10MB max preview size
+- HTTP/HTTPS egress via NetworkPolicy
+
+#### Client Configuration
+
+URL previews are **per-room settings** that users must enable:
+
+**Step 1: Enable in User Settings**
+1. Element Web → Click avatar → **All Settings**
+2. **Preferences** tab
+3. **Timeline** section
+4. Enable:
+   - ✅ "Show previews for links in messages"
+   - ✅ "Show inline URL previews"
+
+**Step 2: Enable in Room Settings**
+1. Open room → Click room name → **Settings**
+2. **General** tab (⚠️ NOT Security & Privacy!)
+3. Enable:
+   - ✅ "Enable URL previews for this room"
+
+**Step 3: Test**
+Send a link: `https://github.com`
+
+Preview appears in 2-10 seconds with title, description, and image!
+
+#### Security
+
+URL preview is protected against SSRF attacks:
+
+```yaml
+url_preview_ip_range_blacklist:
+  - '127.0.0.0/8'      # Localhost
+  - '10.0.0.0/8'       # Private networks
+  - '172.16.0.0/12'
+  - '192.168.0.0/16'
+  - '169.254.0.0/16'   # Link-local
+  - '::1/128'          # IPv6 localhost
+  - 'fe80::/10'        # IPv6 link-local
+```
+
+#### Troubleshooting
+
+**Previews not appearing:**
+```bash
+# 1. Check Synapse config
+kubectl exec deployment/matrix-synapse-synapse -n matrix -- \
+  cat /data/homeserver-override.yaml | grep url_preview_enabled
+
+# 2. Check NetworkPolicy allows HTTP/HTTPS
+kubectl get networkpolicy matrix-synapse-synapse -n matrix -o yaml
+
+# 3. Test URL fetch from Synapse pod
+kubectl exec deployment/matrix-synapse-synapse -n matrix -- \
+  curl -I https://github.com
+
+# 4. Check Synapse logs
+kubectl logs deployment/matrix-synapse-synapse -n matrix | grep preview
+```
+
+**Common issues:**
+- ❌ Room setting not enabled → Enable in room General tab
+- ❌ NetworkPolicy blocking egress → Check port 80/443 allowed
+- ❌ URL returns 403/404 → Some sites block preview bots
+- ❌ SSRF protection triggered → URL pointing to internal IP
+
+---
+
+### Element Web Theming
+
+Element Web supports dark theme for the main application interface.
+
+#### Configuration
+
+```yaml
 element:
-  ingress:
-    enabled: true
-    className: "traefik"
-    hostname: "element.example.com"
-    annotations:
-      cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    tls:
-      enabled: true
-      secretName: "matrix-element-tls"
+  config:
+    # Set default theme
+    defaultTheme: "dark"
+
+    # Branding
+    branding:
+      authHeaderLogoUrl: "https://example.com/logo.png"
+      welcomeBackgroundUrl: "https://example.com/background.jpg"
 ```
 
-### Full Configuration Reference
+#### Custom Theme Colors
 
-See `values.yaml` for all available configuration options with detailed comments.
+You can define custom color schemes:
+
+```yaml
+element:
+  config:
+    customThemes:
+      - name: "Dark"
+        is_dark: true
+        colors:
+          accent-color: "#0dbd8b"
+          primary-color: "#0dbd8b"
+          warning-color: "#ff6b6b"
+          sidebar-color: "#15191e"
+          roomlist-background-color: "#15191e"
+          timeline-background-color: "#21262c"
+          timeline-text-color: "#ffffff"
+```
+
+#### Known Limitation: Login Page Theme
+
+⚠️ **Important**: Element Web's login/registration pages are **hardcoded to light theme** in the source code. This is a [known Element Web issue (#24530)](https://github.com/element-hq/element-web/issues/24530).
+
+**What this means:**
+- ✅ Dark theme works perfectly **after logging in**
+- ❌ Login page remains light-themed
+- ❌ Cannot be changed via configuration
+- ❌ Affects ALL Element Web instances (not specific to this chart)
+
+**Workarounds:**
+1. **Accept it** - Standard behavior for all Element Web deployments
+2. **Custom build** - Fork Element Web and modify login page styling (requires maintenance)
+3. **Wait for fix** - Element team working on redesign (no ETA)
+
+**Why?**
+The Element team indicated this requires "a full design sprint for the sign-in flow" - it's not just a config option but needs design work.
 
 ---
 
 ## Coturn TURN Server (Video/Voice Calls)
 
-The Helm chart includes an integrated Coturn TURN server for WebRTC video and voice calls. TURN (Traversal Using Relays around NAT) is required for calls to work when users are behind NAT/firewalls.
+Coturn TURN server enables video and voice calls to work through NAT/firewalls.
 
 ### Quick Start
 
-**1. Generate TURN shared secret:**
+**1. Generate TURN secret:**
 ```bash
 ./scripts/generate-secrets.sh turn
 ```
 
-**2. Enable coturn in `values-prod.yaml`:**
+**2. Enable in values:**
 ```yaml
 coturn:
   enabled: true
-  externalIP: "YOUR_PUBLIC_IP"  # Public IP for TURN relay
-  realm: "turn.waadoo.ovh"
+  externalIP: "YOUR_PUBLIC_IP"
+  realm: "turn.example.com"
 
   service:
-    type: LoadBalancer  # or NodePort
+    type: LoadBalancer
     externalDns:
       enabled: true
-      hostname: "turn.waadoo.ovh"
-
-  ingress:
-    enabled: true
-    hostname: "turn.waadoo.ovh"
-    annotations:
-      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      hostname: "turn.example.com"
 ```
 
 **3. Deploy:**
@@ -573,118 +698,23 @@ coturn:
 helm upgrade matrix-synapse . -n matrix -f values-prod.yaml
 ```
 
-### How It Works
-
-- **Automatic Integration**: When `coturn.enabled: true`, Synapse automatically configures TURN URIs pointing to the internal coturn service
-- **Shared Secret**: Both Synapse and Coturn use the same shared secret from Kubernetes secret `matrix-synapse-turn-credentials`
-- **No Manual Configuration**: The TURN shared secret is automatically injected into both Synapse and Coturn configurations
-
 ### Architecture
 
-```
-┌─────────────┐
-│ Element Web │
-└──────┬──────┘
-       │ WebRTC
-       ↓
-┌─────────────┐    turn_uris     ┌────────────┐
-│   Synapse   │ ←───────────────→ │   Coturn   │
-└─────────────┘  shared_secret   └─────┬──────┘
-                                       │
-                                  Relay Media
-                                       ↓
-                                  Public IP
-```
-
-### Security Features
-
-✅ **Shared Secret Auth**: Uses cryptographically secure shared secret
-✅ **Private IP Blocking**: Prevents relay to private/loopback addresses
-✅ **TLS Support**: TURNS (secure TURN) with certificate
-✅ **User Quotas**: Limits to prevent abuse
-✅ **Unprivileged User**: Runs as `nobody:nogroup`
-✅ **Read-Only Filesystem**: Container security hardening
+Synapse automatically configures TURN when `coturn.enabled: true`:
+- Shared secret injected from Kubernetes secret
+- TURN URIs auto-configured
+- No manual configuration needed
 
 ### Network Requirements
 
-**Ports that need to be open:**
+**Required ports:**
 - `3478/UDP` - TURN (UDP)
 - `3478/TCP` - TURN (TCP)
-- `5349/UDP` - TURNS (secure, UDP)
-- `5349/TCP` - TURNS (secure, TCP)
-- `49152-49252/UDP` - Media relay ports (configurable)
+- `5349/UDP` - TURNS (secure)
+- `5349/TCP` - TURNS (secure)
+- `49152-49252/UDP` - Media relay ports
 
-**Service Types:**
-
-| Type | Use Case | External IP |
-|------|----------|-------------|
-| **LoadBalancer** | Cloud providers (AWS/GCP/Azure) | Auto-assigned |
-| **NodePort** | On-premises, MetalLB | Node IP |
-| **ClusterIP** | Internal only (testing) | No external access |
-
-### Configuration Examples
-
-**Minimal (internal only):**
-```yaml
-coturn:
-  enabled: true
-  externalIP: "192.168.1.100"
-  realm: "turn.example.com"
-```
-
-**Production with LoadBalancer:**
-```yaml
-coturn:
-  enabled: true
-  externalIP: "203.0.113.50"
-  realm: "turn.waadoo.ovh"
-
-  service:
-    type: LoadBalancer
-    loadBalancerIP: "203.0.113.50"
-    externalDns:
-      enabled: true
-      hostname: "turn.waadoo.ovh"
-      ttl: 300
-
-  tls:
-    enabled: true
-    secretName: "coturn-tls"
-
-  ingress:
-    enabled: true
-    hostname: "turn.waadoo.ovh"
-    annotations:
-      cert-manager.io/cluster-issuer: "letsencrypt-prod"
-
-  resources:
-    limits:
-      cpu: 2000m
-      memory: 1Gi
-    requests:
-      cpu: 500m
-      memory: 256Mi
-```
-
-**Production with NodePort:**
-```yaml
-coturn:
-  enabled: true
-  externalIP: "203.0.113.50"
-  realm: "turn.waadoo.ovh"
-
-  service:
-    type: NodePort
-    nodePorts:
-      turnUdp: 30478
-      turnTcp: 30478
-      turnsUdp: 30349
-      turnsTcp: 30349
-```
-
-### Firewall Configuration
-
-**iptables example:**
+**Firewall rules:**
 ```bash
 # TURN ports
 iptables -A INPUT -p udp --dport 3478 -j ACCEPT
@@ -692,80 +722,70 @@ iptables -A INPUT -p tcp --dport 3478 -j ACCEPT
 iptables -A INPUT -p udp --dport 5349 -j ACCEPT
 iptables -A INPUT -p tcp --dport 5349 -j ACCEPT
 
-# Media relay ports
+# Media relay
 iptables -A INPUT -p udp --dport 49152:49252 -j ACCEPT
 ```
 
-**cloud-init / security groups:**
-- Allow inbound UDP/TCP 3478, 5349
-- Allow inbound UDP 49152-49252
-- Allow all outbound
+### Configuration Examples
+
+**Production with LoadBalancer:**
+```yaml
+coturn:
+  enabled: true
+  externalIP: "203.0.113.50"
+  realm: "turn.example.com"
+
+  service:
+    type: LoadBalancer
+    loadBalancerIP: "203.0.113.50"
+
+  tls:
+    enabled: true
+    secretName: "coturn-tls"
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+```
+
+**NodePort setup:**
+```yaml
+coturn:
+  enabled: true
+  externalIP: "203.0.113.50"
+
+  service:
+    type: NodePort
+    nodePorts:
+      turnUdp: 30478
+      turnTcp: 30478
+```
 
 ### Troubleshooting
 
-**Test TURN connectivity:**
 ```bash
-# Check if coturn pod is running
+# Check coturn pod
 kubectl get pods -n matrix | grep coturn
 
-# Check coturn logs
+# View logs
 kubectl logs -n matrix deployment/matrix-synapse-coturn
 
-# Test TURN port
-nc -zv turn.waadoo.ovh 3478
+# Test connectivity
+nc -zv turn.example.com 3478
 
-# Verify Synapse sees coturn
-kubectl exec -n matrix deployment/matrix-synapse-synapse -- \
+# Verify Synapse config
+kubectl exec deployment/matrix-synapse-synapse -n matrix -- \
   cat /data/homeserver-override.yaml | grep -A 10 turn_uris
 ```
 
 **Common issues:**
 
-1. **Calls fail immediately**
-   - Check TURN shared secret matches in both Synapse and Coturn
-   - Verify `kubectl get secret matrix-synapse-turn-credentials -n matrix`
+1. **Calls fail** - Check TURN shared secret matches
+2. **One-way audio** - External IP misconfigured or firewall blocking
+3. **TURN unreachable** - LoadBalancer IP not assigned or ports not open
 
-2. **One-way audio/video**
-   - External IP not configured correctly
-   - Firewall blocking media relay ports (49152-49252)
-
-3. **TURN server unreachable**
-   - LoadBalancer IP not assigned
-   - DNS record not created (check external-dns logs)
-   - Ports not open in cloud security groups
-
-**Enable debug logging:**
-```yaml
-coturn:
-  extraConfig: |
-    verbose
-    log-file=stdout
-```
-
-### Using External TURN Server
-
-If you prefer to use an external TURN server instead of the integrated coturn:
-
-```yaml
-coturn:
-  enabled: false  # Disable integrated coturn
-
-synapse:
-  server:
-    turn:
-      enabled: true
-      uris:
-        - "turn:turn.example.com:3478?transport=udp"
-        - "turn:turn.example.com:3478?transport=tcp"
-        - "turns:turn.example.com:5349?transport=tcp"
-      userLifetime: "1h"
-```
-
-Then configure the TURN shared secret from Kubernetes:
-```bash
-./scripts/generate-secrets.sh turn
-# Use the secret on your external TURN server
-```
+See full Coturn documentation in original README for advanced configuration.
 
 ---
 
@@ -773,61 +793,50 @@ Then configure the TURN shared secret from Kubernetes:
 
 ### Admin User
 
-The admin user is automatically created during installation by a post-install Helm job.
+Created automatically during installation:
 
-**Get admin credentials:**
 ```bash
+# Get credentials
 cat .secrets/admin-credentials.txt
 
-# Or from Kubernetes secret:
+# Or from Kubernetes
 kubectl get secret matrix-synapse-admin-credentials -n matrix \
   -o jsonpath='{.data.password}' | base64 -d
 ```
 
-### Creating Additional Users
+### Creating Users
 
-Use the comprehensive administration script for user and room management:
+Use the administration script:
 
 ```bash
-# Basic user with auto-generated password
+# Create user with auto-generated password
 ./scripts/matrix-admin.sh create -u alice -e alice@example.com
 
-# Admin user with custom password
+# Create admin user
 ./scripts/matrix-admin.sh create -u bob -p SecurePass123 -e bob@example.com -a
-
-# User with display name
-./scripts/matrix-admin.sh create -u charlie -d "Charlie Brown" -e charlie@example.com
 
 # List all users
 ./scripts/matrix-admin.sh list
 
-# Show detailed user information
+# Show user details
 ./scripts/matrix-admin.sh info -u alice
 
-# List all rooms
-./scripts/matrix-admin.sh room-list
+# Update password
+./scripts/matrix-admin.sh update-password -u alice -p NewPassword
+
+# Deactivate user
+./scripts/matrix-admin.sh deactivate -u alice
+
+# Delete user
+./scripts/matrix-admin.sh delete -u alice
 ```
 
-**User management commands:**
-- `create` - Create a new user
-- `list` - List all users
-- `info` - Show detailed user information
-- `delete` - Delete a user
-- `update-password` - Update user password
-- `deactivate` - Deactivate a user account
-
-**Room management commands:**
-- `room-list` - List all rooms
-- `room-info` - Show room details
-- `room-create` - Create a new room
-- `room-delete` - Delete a room
-
-**User credentials are saved to:**
+**Credentials saved to:**
 ```
 .secrets/users/<username>.txt
 ```
 
-See [scripts/README.md](scripts/README.md) for detailed user management documentation.
+See `scripts/README.md` for full documentation.
 
 ---
 
@@ -838,153 +847,61 @@ See [scripts/README.md](scripts/README.md) for detailed user management document
 1. **PostgreSQL Database** - All user data, messages, room state
 2. **Media Store** - Uploaded files, images, videos
 3. **Signing Keys** - Server cryptographic keys
-4. **Secrets** - Kubernetes secrets (optional, can regenerate)
+4. **Secrets** - Kubernetes secrets
 
-### Manual Backup
+### Backup Commands
 
-#### Backup PostgreSQL Database
-
+**Database:**
 ```bash
-# Create database backup
 kubectl exec matrix-synapse-postgresql-0 -n matrix -- \
   pg_dump -U synapse synapse_prod | gzip > matrix-db-$(date +%Y%m%d).sql.gz
-
-# Or backup to pod then copy out
-kubectl exec matrix-synapse-postgresql-0 -n matrix -- \
-  pg_dump -U synapse synapse_prod > /tmp/backup.sql
-
-kubectl cp matrix/matrix-synapse-postgresql-0:/tmp/backup.sql \
-  ./matrix-db-$(date +%Y%m%d).sql
 ```
 
-#### Backup Media Store
-
+**Media Store:**
 ```bash
-# Get Synapse pod name
 POD=$(kubectl get pod -n matrix -l app.kubernetes.io/component=synapse -o jsonpath='{.items[0].metadata.name}')
-
-# Backup media store
-kubectl exec $POD -n matrix -- tar czf /tmp/media-store.tar.gz /data/media_store
-
-# Copy to local machine
-kubectl cp matrix/$POD:/tmp/media-store.tar.gz \
-  ./matrix-media-$(date +%Y%m%d).tar.gz
+kubectl exec $POD -n matrix -- tar czf /tmp/media.tar.gz /data/media_store
+kubectl cp matrix/$POD:/tmp/media.tar.gz ./matrix-media-$(date +%Y%m%d).tar.gz
 ```
 
-#### Backup Signing Keys
-
+**Signing Keys:**
 ```bash
-# Backup signing keys
 kubectl exec $POD -n matrix -- cat /data/matrix.example.com.signing.key > \
-  ./matrix-signing-key-$(date +%Y%m%d).key
+  matrix-signing-key-$(date +%Y%m%d).key
 ```
 
-#### Backup Kubernetes Secrets
-
+**Secrets:**
 ```bash
-# Export all Matrix secrets
 kubectl get secrets -n matrix -o yaml > matrix-secrets-$(date +%Y%m%d).yaml
-
-# Or specific secrets
-kubectl get secret matrix-synapse-postgresql -n matrix -o yaml > postgres-secret.yaml
-kubectl get secret matrix-synapse-admin-credentials -n matrix -o yaml > admin-secret.yaml
 ```
 
 ### Restore Procedures
 
-#### Restore PostgreSQL Database
-
+**Database:**
 ```bash
-# Copy SQL dump to PostgreSQL pod
-kubectl cp ./matrix-db-20251023.sql.gz matrix/matrix-synapse-postgresql-0:/tmp/
-
-# Restore database
-kubectl exec -it matrix-synapse-postgresql-0 -n matrix -- bash
-
-# Inside pod:
-gunzip /tmp/matrix-db-20251023.sql.gz
-psql -U synapse synapse_prod < /tmp/matrix-db-20251023.sql
-exit
-```
-
-#### Restore Media Store
-
-```bash
-# Copy media archive to Synapse pod
-kubectl cp ./matrix-media-20251023.tar.gz matrix/$POD:/tmp/
-
-# Extract media
-kubectl exec $POD -n matrix -- \
-  tar xzf /tmp/matrix-media-20251023.tar.gz -C /data/
-```
-
-#### Restore Signing Keys
-
-```bash
-# Copy signing key to pod
-kubectl cp ./matrix-signing-key-20251023.key matrix/$POD:/data/matrix.example.com.signing.key
-
-# Restart Synapse to load key
-kubectl rollout restart deployment/matrix-synapse-synapse -n matrix
-```
-
-#### Restore Kubernetes Secrets
-
-```bash
-# Delete existing secrets (if any)
-kubectl delete secret matrix-synapse-postgresql -n matrix
-kubectl delete secret matrix-synapse-admin-credentials -n matrix
-
-# Apply backed up secrets
-kubectl apply -f matrix-secrets-20251023.yaml
-```
-
-### Complete Disaster Recovery
-
-Full recovery procedure from backups:
-
-```bash
-# 1. Create namespace
-kubectl create namespace matrix
-
-# 2. Restore secrets
-kubectl apply -f matrix-secrets-backup.yaml
-
-# 3. Install chart (this creates PVCs)
-helm install matrix-synapse . \
-  --namespace matrix \
-  --values values-prod.yaml
-
-# 4. Wait for PostgreSQL to be ready
-kubectl wait --for=condition=ready pod/matrix-synapse-postgresql-0 -n matrix --timeout=300s
-
-# 5. Restore database
 kubectl cp ./matrix-db-backup.sql.gz matrix/matrix-synapse-postgresql-0:/tmp/
 kubectl exec -it matrix-synapse-postgresql-0 -n matrix -- \
-  bash -c "gunzip /tmp/matrix-db-backup.sql.gz && psql -U synapse synapse_prod < /tmp/matrix-db-backup.sql"
+  bash -c "gunzip /tmp/matrix-db-backup.sql.gz && \
+           psql -U synapse synapse_prod < /tmp/matrix-db-backup.sql"
+```
 
-# 6. Restore media and signing keys
+**Media & Keys:**
+```bash
 POD=$(kubectl get pod -n matrix -l app.kubernetes.io/component=synapse -o jsonpath='{.items[0].metadata.name}')
 kubectl cp ./matrix-media-backup.tar.gz matrix/$POD:/tmp/
 kubectl exec $POD -n matrix -- tar xzf /tmp/matrix-media-backup.tar.gz -C /data/
 kubectl cp ./matrix-signing-key.key matrix/$POD:/data/matrix.example.com.signing.key
-
-# 7. Restart Synapse
 kubectl rollout restart deployment/matrix-synapse-synapse -n matrix
-
-# 8. Verify
-kubectl get pods -n matrix
 ```
 
-### Backup Best Practices
+### Best Practices
 
-1. **Automate Backups** - Use CronJobs or backup tools
-2. **Multiple Locations** - Store backups in S3, NFS, and local
-3. **Test Restores** - Regularly verify backup integrity
-4. **Retention Policy** - Keep daily for 7 days, weekly for 4 weeks, monthly for 6 months
-5. **Encrypt Backups** - Use encryption for sensitive data
-6. **Monitor Backups** - Alert on backup failures
-7. **Document Process** - Keep restore procedures updated
+1. **Automate backups** - Use CronJobs
+2. **Multiple locations** - S3, NFS, and local
+3. **Test restores** - Verify backups work
+4. **Retention policy** - Daily/weekly/monthly
+5. **Encrypt backups** - Sensitive data protection
+6. **Monitor backups** - Alert on failures
 
 ---
 
@@ -995,166 +912,79 @@ kubectl get pods -n matrix
 #### Pods Not Starting
 
 ```bash
-# Check pod status
 kubectl get pods -n matrix
-
-# Check pod events
 kubectl describe pod <pod-name> -n matrix
-
-# Check logs
 kubectl logs <pod-name> -n matrix
 ```
 
-**Common causes:**
-- PVC not binding (check storage class)
-- Image pull errors (check registry access)
-- Resource limits (check node capacity)
-- Secret not found (regenerate secrets)
+**Causes:** PVC not binding, image pull errors, resource limits, missing secrets
 
 #### Admin Login Fails
 
 ```bash
-# Verify admin credentials
+# Verify credentials
 cat .secrets/admin-credentials.txt
-
-# Check registration secret is substituted
-kubectl exec deployment/matrix-synapse-synapse -n matrix -- \
-  cat /data/homeserver-override.yaml | grep registration_shared_secret
-
-# Should show actual hex value, not ${REGISTRATION_SHARED_SECRET}
 
 # Check admin job logs
 kubectl logs job/matrix-synapse-create-admin -n matrix
 
-# Test login via API
+# Test API login
 kubectl exec deployment/matrix-synapse-synapse -n matrix -- \
-  curl -s -X POST http://localhost:8008/_matrix/client/r0/login \
+  curl -X POST http://localhost:8008/_matrix/client/r0/login \
   -H "Content-Type: application/json" \
-  -d '{"type":"m.login.password","user":"admin","password":"YOUR_PASSWORD"}'
+  -d '{"type":"m.login.password","user":"admin","password":"PASSWORD"}'
 ```
 
 #### Database Connection Errors
 
 ```bash
-# Check PostgreSQL is running
+# Check PostgreSQL
 kubectl get pod matrix-synapse-postgresql-0 -n matrix
-
-# Check PostgreSQL logs
 kubectl logs matrix-synapse-postgresql-0 -n matrix
 
-# Verify database credentials
-kubectl get secret matrix-synapse-postgresql -n matrix -o yaml
-
-# Test connection from Synapse pod
+# Test connection
 kubectl exec deployment/matrix-synapse-synapse -n matrix -- \
   pg_isready -h matrix-synapse-postgresql -p 5432
 ```
 
 #### Video Calls Not Working
 
-**Error: "Call invites are not allowed in public rooms"**
+**Error:** "Call invites are not allowed in public rooms"
 
 **Solution:** Change room to private (invite-only):
-1. Open room settings in Element Web
-2. Go to "Security & Privacy"
-3. Change "Room Access" to "Private (invite only)"
-4. Save
+1. Room settings → Security & Privacy
+2. Change "Room Access" to "Private (invite only)"
+3. Save
 
-**Alternative:** Use direct messages (DMs) for 1-on-1 calls - these always support calls.
+**Alternative:** Use direct messages (DMs) - always support calls
 
-**Why:** Matrix Synapse blocks calls in public rooms by design for privacy/security reasons.
-
-#### Ingress Not Working
+#### Ingress/TLS Issues
 
 ```bash
 # Check ingress
 kubectl get ingress -n matrix
 
-# Check ingress controller logs
-kubectl logs -n traefik -l app.kubernetes.io/component=controller
-
-# Verify DNS
-nslookup matrix.example.com
-nslookup element.example.com
+# Check certificates
+kubectl get certificate -n matrix
+kubectl describe certificate matrix-synapse-tls -n matrix
 
 # Test internal service
 kubectl run -it --rm debug --image=curlimages/curl --restart=Never -n matrix -- \
   curl http://matrix-synapse-synapse:8008/_matrix/static/
 ```
 
-#### TLS Certificate Issues
-
-```bash
-# Check certificate
-kubectl get certificate -n matrix
-
-# Check cert-manager logs
-kubectl logs -n cert-manager -l app=cert-manager
-
-# Describe certificate for errors
-kubectl describe certificate matrix-synapse-tls -n matrix
-```
-
 ### Getting Help
 
-1. **Check Logs:**
-   ```bash
-   # Synapse logs
-   kubectl logs -l app.kubernetes.io/component=synapse -n matrix --tail=100
-
-   # All component logs
-   kubectl logs -l app.kubernetes.io/instance=matrix-synapse -n matrix --tail=50
-   ```
-
-2. **Check Events:**
-   ```bash
-   kubectl get events -n matrix --sort-by='.lastTimestamp'
-   ```
-
-3. **Synapse Admin API:**
-   ```bash
-   # Get server version
-   kubectl exec deployment/matrix-synapse-synapse -n matrix -- \
-     curl -s http://localhost:8008/_synapse/admin/v1/server_version
-
-   # Check health
-   kubectl exec deployment/matrix-synapse-synapse -n matrix -- \
-     curl -s http://localhost:8008/health
-   ```
-
-4. **Increase Log Verbosity:**
-
-   Edit ConfigMap to set log level to DEBUG:
-   ```bash
-   kubectl edit configmap matrix-synapse-synapse-config -n matrix
-   # Change: level: DEBUG
-   kubectl rollout restart deployment/matrix-synapse-synapse -n matrix
-   ```
-
-### Advanced Debugging
-
-#### Access Synapse Shell
-
 ```bash
-kubectl exec -it deployment/matrix-synapse-synapse -n matrix -- /bin/bash
-```
+# View logs
+kubectl logs -l app.kubernetes.io/component=synapse -n matrix --tail=100
 
-#### Access PostgreSQL Shell
+# Check events
+kubectl get events -n matrix --sort-by='.lastTimestamp'
 
-```bash
-kubectl exec -it matrix-synapse-postgresql-0 -n matrix -- psql -U synapse synapse_prod
-```
-
-**Useful queries:**
-```sql
--- List all users
-SELECT name, admin, deactivated FROM users;
-
--- List all rooms
-SELECT room_id, name, topic FROM room_stats_state LIMIT 10;
-
--- Check database size
-SELECT pg_size_pretty(pg_database_size('synapse_prod'));
+# Health check
+kubectl exec deployment/matrix-synapse-synapse -n matrix -- \
+  curl -s http://localhost:8008/health
 ```
 
 ---
@@ -1163,83 +993,46 @@ SELECT pg_size_pretty(pg_database_size('synapse_prod'));
 
 ### Best Practices
 
-1. **Change Default Passwords**
-   - Change admin password after first login
-   - Rotate database passwords periodically
+1. **Change default passwords** immediately
+2. **Enable TLS** with Let's Encrypt
+3. **Use NetworkPolicies** for pod isolation
+4. **Secure secrets** - Use external secret managers
+5. **Regular updates** - Monitor security advisories
+6. **Enable 2FA** for admin accounts
+7. **Backup encryption** - Encrypt backup storage
+8. **Audit logs** - Monitor for suspicious activity
 
-2. **Use TLS Everywhere**
-   - Enable TLS for ingress (Let's Encrypt)
-   - Use cert-manager for automatic renewal
+### Network Security
 
-3. **Restrict Network Access**
-   - Use NetworkPolicies to limit pod communication
-   - Firewall database access to only Synapse pods
-
-4. **Secret Management**
-   - Delete local `.secrets/` files after saving to password manager
-   - Use Kubernetes secrets, not ConfigMaps
-   - Consider external secret managers (Vault, Sealed Secrets)
-
-5. **Regular Updates**
-   - Keep Synapse, Element, and PostgreSQL updated
-   - Monitor security advisories
-
-6. **Backup Encryption**
-   - Encrypt backups before storing
-   - Secure backup storage access
-
-7. **Audit Logs**
-   - Enable audit logging
-   - Monitor for suspicious activity
+```yaml
+networkPolicy:
+  enabled: true
+  ingress:
+    traefik:
+      namespaceSelector:
+        name: traefik
+  egress:
+    sso:
+      namespaceSelector:
+        kubernetes.io/metadata.name: authentif
+```
 
 ---
 
 ## Upgrading
 
-### Upgrade Chart Version
-
-#### From Helm Repository
+### Upgrade Chart
 
 ```bash
 # Backup first!
 kubectl exec matrix-synapse-postgresql-0 -n matrix -- \
   pg_dump -U synapse synapse_prod | gzip > backup-before-upgrade.sql.gz
 
-# Update Helm repository cache
+# Update repository
 helm repo update
 
-# Check available versions
-helm search repo matrix-synapse/matrix-synapse --versions
-
-# Upgrade to latest version
+# Upgrade
 helm upgrade matrix-synapse matrix-synapse/matrix-synapse \
-  --namespace matrix \
-  --values values-prod.yaml \
-  --timeout 10m
-
-# Or upgrade to specific version
-helm upgrade matrix-synapse matrix-synapse/matrix-synapse \
-  --namespace matrix \
-  --values values-prod.yaml \
-  --version 1.2.0 \
-  --timeout 10m
-
-# Verify
-kubectl get pods -n matrix
-```
-
-#### From Source
-
-```bash
-# Backup first!
-kubectl exec matrix-synapse-postgresql-0 -n matrix -- \
-  pg_dump -U synapse synapse_prod | gzip > backup-before-upgrade.sql.gz
-
-# Pull latest changes
-git pull origin main
-
-# Update chart
-helm upgrade matrix-synapse . \
   --namespace matrix \
   --values values-prod.yaml \
   --timeout 10m
@@ -1250,31 +1043,12 @@ kubectl get pods -n matrix
 
 ### Upgrade Synapse Version
 
-1. Update image tag in `values-prod.yaml`:
-   ```yaml
-   synapse:
-     image:
-       tag: "v1.141.0"  # New version
-   ```
+1. Update image tag in `values-prod.yaml`
+2. Check [release notes](https://github.com/element-hq/synapse/releases)
+3. Backup database
+4. Apply upgrade
 
-2. Check release notes: https://github.com/element-hq/synapse/releases
-
-3. Backup database before upgrading
-
-4. Apply upgrade:
-   ```bash
-   helm upgrade matrix-synapse . \
-     --namespace matrix \
-     --values values-prod.yaml
-   ```
-
-### Database Migrations
-
-Synapse automatically runs database migrations on startup. Monitor logs:
-
-```bash
-kubectl logs -f deployment/matrix-synapse-synapse -n matrix
-```
+Synapse runs database migrations automatically on startup.
 
 ---
 
@@ -1283,26 +1057,26 @@ kubectl logs -f deployment/matrix-synapse-synapse -n matrix
 ### Complete Removal
 
 ```bash
-# 1. Uninstall Helm release
+# Uninstall chart
 helm uninstall matrix-synapse -n matrix
 
-# 2. Delete PVCs (WARNING: Deletes all data!)
+# Delete data (WARNING: Permanent!)
 kubectl delete pvc --all -n matrix
 
-# 3. Delete secrets
+# Delete secrets
 kubectl delete secrets --all -n matrix
 
-# 4. Delete namespace
+# Delete namespace
 kubectl delete namespace matrix
 ```
 
-### Keep Data for Reinstall
+### Keep Data
 
 ```bash
 # Uninstall but keep PVCs and secrets
 helm uninstall matrix-synapse -n matrix
 
-# Secrets and PVCs remain - can reinstall later
+# Reinstall later
 helm install matrix-synapse . --namespace matrix --values values-prod.yaml
 ```
 
@@ -1313,60 +1087,37 @@ helm install matrix-synapse . --namespace matrix --values values-prod.yaml
 ### Documentation
 
 - **Matrix Specification**: https://spec.matrix.org/
-- **Synapse Documentation**: https://element-hq.github.io/synapse/
-- **Element Documentation**: https://element.io/user-guide
+- **Synapse Docs**: https://element-hq.github.io/synapse/
+- **Element Guide**: https://element.io/user-guide
+- **Scripts README**: [scripts/README.md](scripts/README.md)
 
-### Scripts
-
-- [scripts/README.md](scripts/README.md) - Detailed script documentation
-- [scripts/generate-secrets.sh](scripts/generate-secrets.sh) - Secret management
-- [scripts/matrix-admin.sh](scripts/matrix-admin.sh) - User and room administration
-
-### Configuration Files
-
-- `values.yaml` - Default values with all options
-- `values-prod.yaml` - Your production configuration
-- `Chart.yaml` - Chart metadata
-
----
-
-## Support
-
-For issues or questions:
+### Support
 
 1. Check [Troubleshooting](#troubleshooting) section
 2. Review logs: `kubectl logs -n matrix -l app.kubernetes.io/instance=matrix-synapse`
-3. Check Matrix community: #synapse:matrix.org
+3. Matrix community: #synapse:matrix.org
 4. Synapse issues: https://github.com/element-hq/synapse/issues
 
 ---
 
 ## License
 
-This Helm chart is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+This Helm chart is licensed under the **MIT License** - see [LICENSE](LICENSE) file.
 
-**Deployed Software Licenses:**
+**Deployed Software:**
 - **Matrix Synapse**: Apache License 2.0
 - **Element Web**: Apache License 2.0
 - **PostgreSQL**: PostgreSQL License
-
-### MIT License Summary
-
-You are free to:
-- ✅ Use this chart commercially or personally
-- ✅ Modify and distribute the chart
-- ✅ Use privately without restrictions
-- ✅ Sublicense and sell copies
-
-The only requirement is to include the copyright notice and license in any substantial portions of the software.
+- **Coturn**: BSD License
 
 ---
 
 ## Chart Information
 
-- **Chart Version**: 1.2.0
+- **Chart Version**: 1.5.0
 - **Synapse Version**: v1.140.0
 - **Element Web Version**: v1.12.2
-- **PostgreSQL Version**: 16
+- **PostgreSQL Version**: 16-alpine
+- **Coturn Version**: 4.6-alpine
 
-**Maintainer**: Internal Infrastructure Team
+**Maintainer**: WAADOO - contact@waadoo.ovh

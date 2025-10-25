@@ -27,9 +27,6 @@ data:
       "show_labs_settings": {{ .Values.element.config.features.showLabsSettings }},
       "default_federate": true,
       "default_theme": "dark",
-      {{- if .Values.element.config.branding.customCssUrl }}
-      "custom_css_url": "{{ .Values.element.config.branding.customCssUrl }}",
-      {{- end }}
       "room_directory": {
         "servers": {{ .Values.element.config.roomDirectory.servers | toJson }}
       },
@@ -61,9 +58,32 @@ data:
       }{{- end }},
       "custom_themes": [
         {
-          "name": "Dark Theme",
+          "name": "Dark",
           "is_dark": true,
-          "colors": {}
+          "colors": {
+            "accent-color": "#0dbd8b",
+            "primary-color": "#0dbd8b",
+            "warning-color": "#ff6b6b",
+            "alert": "#ff6b6b",
+            "sidebar-color": "#15191e",
+            "roomlist-background-color": "#15191e",
+            "roomlist-text-color": "#ffffff",
+            "roomlist-text-secondary-color": "#adbac7",
+            "roomlist-highlights-color": "#0dbd8b",
+            "roomlist-separator-color": "#444c56",
+            "timeline-background-color": "#21262c",
+            "timeline-text-color": "#ffffff",
+            "timeline-text-secondary-color": "#adbac7",
+            "timeline-highlights-color": "#0dbd8b",
+            "reaction-row-button-selected-bg-color": "#2d333b",
+            "menu-bg-color": "#2d333b",
+            "menu-selected-color": "#373e47",
+            "focus-bg-color": "#2d333b",
+            "room-highlight-color": "#0dbd8b",
+            "other-user-pill-bg-color": "#2d333b",
+            "username-colors": ["#0dbd8b", "#539bf5", "#9d70f5", "#f778ba", "#ff6b6b", "#ff8b3d", "#ffc53d", "#7ee787"],
+            "avatar-background-colors": ["#0dbd8b", "#539bf5", "#9d70f5", "#f778ba", "#ff6b6b", "#ff8b3d", "#ffc53d", "#7ee787"]
+          }
         }
       ]
     }
