@@ -85,24 +85,38 @@ jobs:
         image:
           - name: synapse
             repo: ghcr.io/element-hq/synapse
-            tag: v1.140.0
+            tag_key: synapse.image.tag
           - name: element-web
             repo: ghcr.io/element-hq/element-web
-            tag: v1.12.2
+            tag_key: element.image.tag
           - name: postgresql
             repo: postgres
-            tag: 16-alpine
+            tag_key: postgresql.image.tag
           - name: coturn
             repo: coturn/coturn
-            tag: 4.6-alpine
+            tag_key: coturn.image.tag
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Extract image tag from values.yaml
+        id: get-tag
+        run: |
+          # Install yq if not available
+          if ! command -v yq &> /dev/null; then
+            sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+            sudo chmod +x /usr/local/bin/yq
+          fi
+
+          # Extract tag from values.yaml using the tag_key
+          TAG=$(yq eval '.${{ matrix.image.tag_key }}' values.yaml | tr -d '"')
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Image ${{ matrix.image.name }} version: $TAG"
+
       - name: Run Trivy vulnerability scanner on ${{ matrix.image.name }}
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: '${{ matrix.image.repo }}:${{ matrix.image.tag }}'
+          image-ref: '${{ matrix.image.repo }}:${{ steps.get-tag.outputs.tag }}'
           format: 'sarif'
           output: 'trivy-${{ matrix.image.name }}-results.sarif'
           severity: 'CRITICAL,HIGH'
@@ -117,7 +131,7 @@ jobs:
       - name: Run Trivy vulnerability scanner (table format)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: '${{ matrix.image.repo }}:${{ matrix.image.tag }}'
+          image-ref: '${{ matrix.image.repo }}:${{ steps.get-tag.outputs.tag }}'
           format: 'table'
           severity: 'CRITICAL,HIGH,MEDIUM'
           exit-code: '0'
@@ -125,7 +139,7 @@ jobs:
       - name: Run Trivy vulnerability scanner (JSON format)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: '${{ matrix.image.repo }}:${{ matrix.image.tag }}'
+          image-ref: '${{ matrix.image.repo }}:${{ steps.get-tag.outputs.tag }}'
           format: 'json'
           output: 'trivy-${{ matrix.image.name }}.json'
           severity: 'CRITICAL,HIGH,MEDIUM,LOW'
@@ -255,6 +269,30 @@ jobs:
       - name: Generate per-image security details
         id: image-details
         run: |
+          # Install yq if not available
+          if ! command -v yq &> /dev/null; then
+            sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+            sudo chmod +x /usr/local/bin/yq
+          fi
+
+          # Extract versions from values.yaml
+          SYNAPSE_VERSION=$(yq eval '.synapse.image.tag' values.yaml | tr -d '"')
+          ELEMENT_VERSION=$(yq eval '.element.image.tag' values.yaml | tr -d '"')
+          POSTGRES_VERSION=$(yq eval '.postgresql.image.tag' values.yaml | tr -d '"')
+          COTURN_VERSION=$(yq eval '.coturn.image.tag' values.yaml | tr -d '"')
+
+          echo "Extracted versions:"
+          echo "Synapse: $SYNAPSE_VERSION"
+          echo "Element: $ELEMENT_VERSION"
+          echo "PostgreSQL: $POSTGRES_VERSION"
+          echo "Coturn: $COTURN_VERSION"
+
+          # Export versions for later use
+          echo "synapse_version=$SYNAPSE_VERSION" >> $GITHUB_OUTPUT
+          echo "element_version=$ELEMENT_VERSION" >> $GITHUB_OUTPUT
+          echo "postgres_version=$POSTGRES_VERSION" >> $GITHUB_OUTPUT
+          echo "coturn_version=$COTURN_VERSION" >> $GITHUB_OUTPUT
+
           # Initialize markdown table for image details
           IMAGE_TABLE="| Image | Version | Critical | High | Medium | Low |\n"
           IMAGE_TABLE="${IMAGE_TABLE}|-------|---------|----------|------|--------|-----|\n"
@@ -275,7 +313,7 @@ jobs:
             MED_BADGE="[![Medium](https://img.shields.io/badge/medium-${MED}-$([ ${MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID})"
             LOW_BADGE="[![Low](https://img.shields.io/badge/low-${LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID})"
 
-            IMAGE_TABLE="${IMAGE_TABLE}| **Synapse** | v1.140.0 | ${CRIT_BADGE} | ${HIGH_BADGE} | ${MED_BADGE} | ${LOW_BADGE} |\n"
+            IMAGE_TABLE="${IMAGE_TABLE}| **Synapse** | ${SYNAPSE_VERSION} | ${CRIT_BADGE} | ${HIGH_BADGE} | ${MED_BADGE} | ${LOW_BADGE} |\n"
           fi
 
           # Process element-web image
@@ -290,7 +328,7 @@ jobs:
             MED_BADGE="[![Medium](https://img.shields.io/badge/medium-${MED}-$([ ${MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID})"
             LOW_BADGE="[![Low](https://img.shields.io/badge/low-${LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID})"
 
-            IMAGE_TABLE="${IMAGE_TABLE}| **Element Web** | v1.12.2 | ${CRIT_BADGE} | ${HIGH_BADGE} | ${MED_BADGE} | ${LOW_BADGE} |\n"
+            IMAGE_TABLE="${IMAGE_TABLE}| **Element Web** | ${ELEMENT_VERSION} | ${CRIT_BADGE} | ${HIGH_BADGE} | ${MED_BADGE} | ${LOW_BADGE} |\n"
           fi
 
           # Process postgresql image
@@ -305,7 +343,7 @@ jobs:
             MED_BADGE="[![Medium](https://img.shields.io/badge/medium-${MED}-$([ ${MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID})"
             LOW_BADGE="[![Low](https://img.shields.io/badge/low-${LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID})"
 
-            IMAGE_TABLE="${IMAGE_TABLE}| **PostgreSQL** | 16-alpine | ${CRIT_BADGE} | ${HIGH_BADGE} | ${MED_BADGE} | ${LOW_BADGE} |\n"
+            IMAGE_TABLE="${IMAGE_TABLE}| **PostgreSQL** | ${POSTGRES_VERSION} | ${CRIT_BADGE} | ${HIGH_BADGE} | ${MED_BADGE} | ${LOW_BADGE} |\n"
           fi
 
           # Process coturn image
@@ -320,7 +358,7 @@ jobs:
             MED_BADGE="[![Medium](https://img.shields.io/badge/medium-${MED}-$([ ${MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID})"
             LOW_BADGE="[![Low](https://img.shields.io/badge/low-${LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID})"
 
-            IMAGE_TABLE="${IMAGE_TABLE}| **Coturn** | 4.6-alpine | ${CRIT_BADGE} | ${HIGH_BADGE} | ${MED_BADGE} | ${LOW_BADGE} |\n"
+            IMAGE_TABLE="${IMAGE_TABLE}| **Coturn** | ${COTURN_VERSION} | ${CRIT_BADGE} | ${HIGH_BADGE} | ${MED_BADGE} | ${LOW_BADGE} |\n"
           fi
 
           echo "image_table<<EOF" >> $GITHUB_OUTPUT
@@ -387,6 +425,17 @@ jobs:
           RUN_ID="${{ github.run_id }}"
           REPO="${{ github.repository }}"
 
+          # Extract versions from values.yaml (same as in image-details step)
+          if ! command -v yq &> /dev/null; then
+            sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+            sudo chmod +x /usr/local/bin/yq
+          fi
+
+          SYNAPSE_VERSION=$(yq eval '.synapse.image.tag' values.yaml | tr -d '"')
+          ELEMENT_VERSION=$(yq eval '.element.image.tag' values.yaml | tr -d '"')
+          POSTGRES_VERSION=$(yq eval '.postgresql.image.tag' values.yaml | tr -d '"')
+          COTURN_VERSION=$(yq eval '.coturn.image.tag' values.yaml | tr -d '"')
+
           # Extract per-image counts
           SYNAPSE_CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' image-scans/trivy-synapse-reports/trivy-synapse.json 2>/dev/null || echo 0)
           SYNAPSE_HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' image-scans/trivy-synapse-reports/trivy-synapse.json 2>/dev/null || echo 0)
@@ -413,14 +462,14 @@ jobs:
           sed -i "/^| \*\*Helm Manifests\*\* |/c\| **Helm Manifests** | ![Status](https://img.shields.io/badge/status-scanned-success) | On every push | $CONFIG_CRIT_BADGE | $CONFIG_HIGH_BADGE | $CONFIG_MED_BADGE | $CONFIG_LOW_BADGE |" README.md
           sed -i "/^| \*\*Container Images\*\* |/c\| **Container Images** | ![Status](https://img.shields.io/badge/status-scanned-success) | Daily + On Push | $IMAGE_CRIT_BADGE | $IMAGE_HIGH_BADGE | $IMAGE_MED_BADGE | $IMAGE_LOW_BADGE |" README.md
 
-          # Update per-image table with clickable badges
-          sed -i "/^| \*\*Synapse\*\* | v1.140.0 |/c\| **Synapse** | v1.140.0 | [![Critical](https://img.shields.io/badge/critical-${SYNAPSE_CRIT}-$([ ${SYNAPSE_CRIT} -eq 0 ] && echo 'success' || echo 'critical'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![High](https://img.shields.io/badge/high-${SYNAPSE_HIGH}-$([ ${SYNAPSE_HIGH} -eq 0 ] && echo 'success' || echo 'important'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Medium](https://img.shields.io/badge/medium-${SYNAPSE_MED}-$([ ${SYNAPSE_MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Low](https://img.shields.io/badge/low-${SYNAPSE_LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID}) |" README.md
+          # Update per-image table with clickable badges (using dynamic versions)
+          sed -i "/^| \*\*Synapse\*\* |/c\| **Synapse** | ${SYNAPSE_VERSION} | [![Critical](https://img.shields.io/badge/critical-${SYNAPSE_CRIT}-$([ ${SYNAPSE_CRIT} -eq 0 ] && echo 'success' || echo 'critical'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![High](https://img.shields.io/badge/high-${SYNAPSE_HIGH}-$([ ${SYNAPSE_HIGH} -eq 0 ] && echo 'success' || echo 'important'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Medium](https://img.shields.io/badge/medium-${SYNAPSE_MED}-$([ ${SYNAPSE_MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Low](https://img.shields.io/badge/low-${SYNAPSE_LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID}) |" README.md
 
-          sed -i "/^| \*\*Element Web\*\* | v1.12.2 |/c\| **Element Web** | v1.12.2 | [![Critical](https://img.shields.io/badge/critical-${ELEMENT_CRIT}-$([ ${ELEMENT_CRIT} -eq 0 ] && echo 'success' || echo 'critical'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![High](https://img.shields.io/badge/high-${ELEMENT_HIGH}-$([ ${ELEMENT_HIGH} -eq 0 ] && echo 'success' || echo 'important'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Medium](https://img.shields.io/badge/medium-${ELEMENT_MED}-$([ ${ELEMENT_MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Low](https://img.shields.io/badge/low-${ELEMENT_LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID}) |" README.md
+          sed -i "/^| \*\*Element Web\*\* |/c\| **Element Web** | ${ELEMENT_VERSION} | [![Critical](https://img.shields.io/badge/critical-${ELEMENT_CRIT}-$([ ${ELEMENT_CRIT} -eq 0 ] && echo 'success' || echo 'critical'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![High](https://img.shields.io/badge/high-${ELEMENT_HIGH}-$([ ${ELEMENT_HIGH} -eq 0 ] && echo 'success' || echo 'important'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Medium](https://img.shields.io/badge/medium-${ELEMENT_MED}-$([ ${ELEMENT_MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Low](https://img.shields.io/badge/low-${ELEMENT_LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID}) |" README.md
 
-          sed -i "/^| \*\*PostgreSQL\*\* | 16-alpine |/c\| **PostgreSQL** | 16-alpine | [![Critical](https://img.shields.io/badge/critical-${POSTGRES_CRIT}-$([ ${POSTGRES_CRIT} -eq 0 ] && echo 'success' || echo 'critical'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![High](https://img.shields.io/badge/high-${POSTGRES_HIGH}-$([ ${POSTGRES_HIGH} -eq 0 ] && echo 'success' || echo 'important'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Medium](https://img.shields.io/badge/medium-${POSTGRES_MED}-$([ ${POSTGRES_MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Low](https://img.shields.io/badge/low-${POSTGRES_LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID}) |" README.md
+          sed -i "/^| \*\*PostgreSQL\*\* |/c\| **PostgreSQL** | ${POSTGRES_VERSION} | [![Critical](https://img.shields.io/badge/critical-${POSTGRES_CRIT}-$([ ${POSTGRES_CRIT} -eq 0 ] && echo 'success' || echo 'critical'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![High](https://img.shields.io/badge/high-${POSTGRES_HIGH}-$([ ${POSTGRES_HIGH} -eq 0 ] && echo 'success' || echo 'important'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Medium](https://img.shields.io/badge/medium-${POSTGRES_MED}-$([ ${POSTGRES_MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Low](https://img.shields.io/badge/low-${POSTGRES_LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID}) |" README.md
 
-          sed -i "/^| \*\*Coturn\*\* | 4.6-alpine |/c\| **Coturn** | 4.6-alpine | [![Critical](https://img.shields.io/badge/critical-${COTURN_CRIT}-$([ ${COTURN_CRIT} -eq 0 ] && echo 'success' || echo 'critical'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![High](https://img.shields.io/badge/high-${COTURN_HIGH}-$([ ${COTURN_HIGH} -eq 0 ] && echo 'success' || echo 'important'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Medium](https://img.shields.io/badge/medium-${COTURN_MED}-$([ ${COTURN_MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Low](https://img.shields.io/badge/low-${COTURN_LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID}) |" README.md
+          sed -i "/^| \*\*Coturn\*\* |/c\| **Coturn** | ${COTURN_VERSION} | [![Critical](https://img.shields.io/badge/critical-${COTURN_CRIT}-$([ ${COTURN_CRIT} -eq 0 ] && echo 'success' || echo 'critical'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![High](https://img.shields.io/badge/high-${COTURN_HIGH}-$([ ${COTURN_HIGH} -eq 0 ] && echo 'success' || echo 'important'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Medium](https://img.shields.io/badge/medium-${COTURN_MED}-$([ ${COTURN_MED} -eq 0 ] && echo 'success' || echo 'orange'))](https://github.com/${REPO}/actions/runs/${RUN_ID}) | [![Low](https://img.shields.io/badge/low-${COTURN_LOW}-informational)](https://github.com/${REPO}/actions/runs/${RUN_ID}) |" README.md
 
           # Show diff
           echo "README changes:"
