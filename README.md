@@ -33,10 +33,15 @@ Production-ready Helm chart for deploying Matrix Synapse homeserver with Element
 ### Security Features
 
 ✅ **Automated Daily Scans** - Runs automatically every day at 2 AM UTC
+
 ✅ **PR Security Checks** - All pull requests are scanned before merge
+
 ✅ **Container Vulnerability Scanning** - All Docker images scanned for CVEs
+
 ✅ **GitHub Security Tab** - Detailed findings available in [Security Dashboard](https://github.com/ludolac/matrix-synapse-stack/security/code-scanning)
+
 ✅ **SARIF Reports** - Structured results for easy tracking
+
 ✅ **Multi-Level Scanning** - Chart configs + rendered manifests + container images
 
 ### What We Scan
@@ -84,19 +89,33 @@ Production-ready Helm chart for deploying Matrix Synapse homeserver with Element
 ## Features
 
 ✅ **Matrix Synapse** v1.140.0 - Full-featured Matrix homeserver
+
 ✅ **Element Web** v1.12.2 - Modern web client with dark theme
+
 ✅ **PostgreSQL 16** - Reliable database backend
+
 ✅ **Coturn TURN Server** - Integrated WebRTC support for video/voice calls
+
 ✅ **URL Previews** - Rich link previews with OpenGraph metadata and SSRF protection
+
 ✅ **SSO/OIDC Support** - Integrate with Authelia, Keycloak, Google, GitHub, Azure AD
+
 ✅ **Two-Factor Authentication** - TOTP support for enhanced security
+
 ✅ **Automated Secret Management** - Scripts for credential generation
+
 ✅ **Admin User Creation** - Post-install job creates admin automatically
+
 ✅ **Ingress Support** - Traefik ingress with TLS
+
 ✅ **Persistent Storage** - Longhorn/PVC for data persistence
+
 ✅ **Network Policies** - Fine-grained network security
+
 ✅ **Security Hardened** - Pod security, secret management, SSRF protection
+
 ✅ **Metrics & Monitoring** - Prometheus metrics enabled
+
 ✅ **Production Ready** - Tested configuration with best practices
 
 ---
@@ -500,10 +519,15 @@ Recovery codes allow access if you lose your authenticator device.
 #### Security Best Practices
 
 ✅ **Save recovery codes** - Store in password manager
+
 ✅ **Enable on critical accounts first** - Admin users should enable 2FA
+
 ✅ **Backup authenticator app** - Use apps with cloud backup (Microsoft Authenticator)
+
 ✅ **Test recovery process** - Verify recovery codes work before relying on them
+
 ❌ **Don't screenshot QR codes** - They can compromise your 2FA
+
 ❌ **Don't share recovery codes** - Treat them like passwords
 
 #### Disabling 2FA
