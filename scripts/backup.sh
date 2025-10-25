@@ -146,17 +146,46 @@ fi
 
 # 3. Backup Signing Keys
 log_info "Backing up signing keys..."
-SERVER_NAME=$(kubectl get configmap -n "${NAMESPACE}" matrix-synapse-synapse-config -o jsonpath='{.data.homeserver\.yaml}' 2>/dev/null | grep "server_name:" | awk '{print $2}' | tr -d '"' || echo "matrix.example.com")
 
-kubectl exec "${SYNAPSE_POD}" -n "${NAMESPACE}" -- \
-    cat "/data/${SERVER_NAME}.signing.key" > "${BACKUP_PATH}/keys/${SERVER_NAME}.signing.key" 2>/dev/null || {
-    log_warning "Signing key not found at /data/${SERVER_NAME}.signing.key"
-}
+# Get server name from configmap
+SERVER_NAME=$(kubectl get configmap -n "${NAMESPACE}" matrix-synapse-synapse-config -o yaml 2>/dev/null | \
+    grep "server_name:" | grep -v "^#" | head -1 | awk -F'"' '{print $2}' || echo "")
 
-if [ -f "${BACKUP_PATH}/keys/${SERVER_NAME}.signing.key" ]; then
-    log_success "Signing keys backup completed"
+if [ -z "$SERVER_NAME" ]; then
+    log_warning "Could not detect server name from config, trying default..."
+    SERVER_NAME="matrix.example.com"
+fi
+
+log_info "Detected server name: ${SERVER_NAME}"
+
+# Try to backup signing key
+SIGNING_KEY_PATH="/data/${SERVER_NAME}.signing.key"
+if kubectl exec "${SYNAPSE_POD}" -n "${NAMESPACE}" -- test -f "${SIGNING_KEY_PATH}" 2>/dev/null; then
+    kubectl exec "${SYNAPSE_POD}" -n "${NAMESPACE}" -- \
+        cat "${SIGNING_KEY_PATH}" > "${BACKUP_PATH}/keys/${SERVER_NAME}.signing.key" 2>/dev/null
+
+    if [ -f "${BACKUP_PATH}/keys/${SERVER_NAME}.signing.key" ] && [ -s "${BACKUP_PATH}/keys/${SERVER_NAME}.signing.key" ]; then
+        KEY_SIZE=$(stat -f%z "${BACKUP_PATH}/keys/${SERVER_NAME}.signing.key" 2>/dev/null || stat -c%s "${BACKUP_PATH}/keys/${SERVER_NAME}.signing.key" 2>/dev/null || echo "0")
+        log_success "Signing key backed up (${KEY_SIZE} bytes)"
+    else
+        log_warning "Signing key file created but appears empty"
+    fi
 else
-    log_warning "No signing keys to backup"
+    log_warning "Signing key not found at ${SIGNING_KEY_PATH}"
+    log_info "Trying to find signing key..."
+
+    # Try to find any signing key
+    FOUND_KEY=$(kubectl exec "${SYNAPSE_POD}" -n "${NAMESPACE}" -- \
+        find /data -name "*.signing.key" -type f 2>/dev/null | head -1)
+
+    if [ -n "$FOUND_KEY" ]; then
+        log_info "Found signing key at: ${FOUND_KEY}"
+        kubectl exec "${SYNAPSE_POD}" -n "${NAMESPACE}" -- \
+            cat "${FOUND_KEY}" > "${BACKUP_PATH}/keys/$(basename ${FOUND_KEY})" 2>/dev/null
+        log_success "Signing key backed up from ${FOUND_KEY}"
+    else
+        log_warning "No signing keys found - this might be a new installation"
+    fi
 fi
 
 # 4. Backup Kubernetes Secrets
