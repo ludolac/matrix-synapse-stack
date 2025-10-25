@@ -784,25 +784,41 @@ kubectl get secret matrix-synapse-admin-credentials -n matrix \
 
 ### Creating Additional Users
 
-Use the provided script to create new users:
+Use the comprehensive administration script for user and room management:
 
 ```bash
 # Basic user with auto-generated password
-./scripts/create-user.sh -u alice -e alice@example.com
+./scripts/matrix-admin.sh create -u alice -e alice@example.com
 
 # Admin user with custom password
-./scripts/create-user.sh -u bob -p SecurePass123 -e bob@example.com -a
+./scripts/matrix-admin.sh create -u bob -p SecurePass123 -e bob@example.com -a
 
 # User with display name
-./scripts/create-user.sh -u charlie -d "Charlie Brown" -e charlie@example.com
+./scripts/matrix-admin.sh create -u charlie -d "Charlie Brown" -e charlie@example.com
+
+# List all users
+./scripts/matrix-admin.sh list
+
+# Show detailed user information
+./scripts/matrix-admin.sh info -u alice
+
+# List all rooms
+./scripts/matrix-admin.sh room-list
 ```
 
-**Script options:**
-- `-u, --username` - Username (required, without `@` or `:domain`)
-- `-p, --password` - Password (optional, auto-generated if not provided)
-- `-e, --email` - Email address (optional)
-- `-a, --admin` - Make user a server admin
-- `-d, --display-name` - Display name (optional)
+**User management commands:**
+- `create` - Create a new user
+- `list` - List all users
+- `info` - Show detailed user information
+- `delete` - Delete a user
+- `update-password` - Update user password
+- `deactivate` - Deactivate a user account
+
+**Room management commands:**
+- `room-list` - List all rooms
+- `room-info` - Show room details
+- `room-create` - Create a new room
+- `room-delete` - Delete a room
 
 **User credentials are saved to:**
 ```
@@ -1302,7 +1318,7 @@ helm install matrix-synapse . --namespace matrix --values values-prod.yaml
 
 - [scripts/README.md](scripts/README.md) - Detailed script documentation
 - [scripts/generate-secrets.sh](scripts/generate-secrets.sh) - Secret management
-- [scripts/create-user.sh](scripts/create-user.sh) - User creation
+- [scripts/matrix-admin.sh](scripts/matrix-admin.sh) - User and room administration
 
 ### Configuration Files
 
