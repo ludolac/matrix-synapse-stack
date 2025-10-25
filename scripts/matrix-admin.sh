@@ -1095,11 +1095,28 @@ room_export() {
         curl -s -X GET "http://localhost:8008/_synapse/admin/v1/rooms/${ENCODED_ROOM_ID}" \
         -H "Authorization: Bearer ${ACCESS_TOKEN}" 2>/dev/null)
 
-    # Get room members
-    print_info "Fetching room members..."
-    ROOM_MEMBERS=$(kubectl exec deployment/${RELEASE_NAME}-synapse -n ${NAMESPACE} -- \
-        curl -s -X GET "http://localhost:8008/_synapse/admin/v2/rooms/${ENCODED_ROOM_ID}/members" \
-        -H "Authorization: Bearer ${ACCESS_TOKEN}" 2>/dev/null)
+    # Extract room members from state events using Python
+    print_info "Extracting room members from state..."
+    ROOM_MEMBERS=$(echo "$ROOM_STATE" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    if 'state' in data:
+        members = [event for event in data['state'] if event.get('type') == 'm.room.member']
+        member_list = []
+        for member in members:
+            member_list.append({
+                'user_id': member.get('state_key', ''),
+                'displayname': member.get('content', {}).get('displayname'),
+                'membership': member.get('content', {}).get('membership'),
+                'avatar_url': member.get('content', {}).get('avatar_url')
+            })
+        print(json.dumps({'members': member_list, 'total': len(member_list)}))
+    else:
+        print(json.dumps({'members': [], 'total': 0}))
+except Exception as e:
+    print(json.dumps({'error': str(e), 'members': [], 'total': 0}))
+" 2>/dev/null || echo '{"members": [], "total": 0}')
 
     # Get messages if requested
     MESSAGES_JSON='[]'
