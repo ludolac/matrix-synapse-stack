@@ -26,7 +26,10 @@ data:
       "default_country_code": "FR",
       "show_labs_settings": {{ .Values.element.config.features.showLabsSettings }},
       "default_federate": true,
-      "default_theme": "light",
+      "default_theme": "dark",
+      {{- if .Values.element.config.branding.customCssUrl }}
+      "custom_css_url": "{{ .Values.element.config.branding.customCssUrl }}",
+      {{- end }}
       "room_directory": {
         "servers": {{ .Values.element.config.roomDirectory.servers | toJson }}
       },
@@ -39,7 +42,8 @@ data:
       "setting_defaults": {
         "breadcrumbs": true,
         "UIFeature.urlPreviews": true,
-        "urlPreviewsEnabled": true
+        "urlPreviewsEnabled": true,
+        "theme": "dark"
       },
       "features": {
         "feature_url_previews": "enable"
@@ -54,13 +58,13 @@ data:
         {{- if .Values.element.config.branding.welcomeBackgroundUrl }}
         "welcome_background_url": "{{ .Values.element.config.branding.welcomeBackgroundUrl }}"
         {{- end }}
-      }{{- end }}{{- if and .Values.element.config.branding .Values.element.config.branding.customCssUrl }},
+      }{{- end }},
       "custom_themes": [
         {
-          "name": "Custom Theme",
-          "is_dark": false,
+          "name": "Dark Theme",
+          "is_dark": true,
           "colors": {}
         }
-      ]{{- end }}
+      ]
     }
 {{- end }}

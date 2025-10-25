@@ -54,6 +54,10 @@ spec:
               mountPath: /app/config.json
               subPath: config.json
               readOnly: true
+            - name: dark-theme-css
+              mountPath: /app/bundles/dark-theme.css
+              subPath: dark-theme.css
+              readOnly: true
             - name: tmp
               mountPath: /tmp
             - name: cache
@@ -66,6 +70,9 @@ spec:
         - name: element-config
           configMap:
             name: {{ include "matrix-synapse.fullname" . }}-element-config
+        - name: dark-theme-css
+          configMap:
+            name: {{ include "matrix-synapse.fullname" . }}-element-dark-css
         - name: tmp
           emptyDir: {}
         - name: cache
