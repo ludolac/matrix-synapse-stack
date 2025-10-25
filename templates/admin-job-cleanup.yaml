@@ -1,0 +1,47 @@
+{{- if .Values.synapse.server.adminUser.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-cleanup-admin-job
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: admin-job-cleanup
+  annotations:
+    "helm.sh/hook": pre-upgrade,pre-install
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  ttlSecondsAfterFinished: 60
+  backoffLimit: 2
+  template:
+    metadata:
+      name: cleanup-admin-job
+    spec:
+      serviceAccountName: {{ include "matrix-synapse.serviceAccountName" . }}
+      restartPolicy: Never
+      containers:
+        - name: cleanup
+          image: bitnami/kubectl:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Cleaning up old admin creation job if it exists..."
+
+              # Delete old job (ignore if not found)
+              kubectl delete job {{ include "matrix-synapse.fullname" . }}-create-admin \
+                --namespace {{ .Release.Namespace }} \
+                --ignore-not-found=true
+
+              echo "Cleanup completed successfully"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+{{- end }}
