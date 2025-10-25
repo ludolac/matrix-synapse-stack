@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matrix Synapse Helm Chart Repository</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        header img {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px 40px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .stat-card {
+            text-align: center;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card .number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-card .label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .install-section {
+            padding: 40px;
+            background: #fff;
+        }
+
+        .install-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .code-block code {
+            display: block;
+        }
+
+        .versions-section {
+            padding: 40px;
+            background: #f8f9fa;
+        }
+
+        .versions-section h2 {
+            color: #333;
+            margin-bottom: 25px;
+            font-size: 1.8rem;
+        }
+
+        .version-card {
+            background: white;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .version-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .version-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .version-number {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .version-date {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .version-badges {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .badge-app {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .badge-latest {
+            background: #c8e6c9;
+            color: #388e3c;
+        }
+
+        .version-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        footer {
+            padding: 30px;
+            text-align: center;
+            background: #2d2d2d;
+            color: white;
+        }
+
+        footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px;
+            font-size: 1.2rem;
+            color: #666;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 40px;
+        }
+
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.8rem;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .install-section, .versions-section {
+                padding: 20px;
+            }
+
+            .version-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="https://matrix.org/images/matrix-logo.svg" alt="Matrix Logo">
+            <h1>Matrix Synapse Helm Chart</h1>
+            <p>Production-ready Kubernetes deployment for Matrix Synapse</p>
+        </header>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="number" id="total-versions">-</div>
+                <div class="label">Total Releases</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="latest-version">-</div>
+                <div class="label">Latest Version</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="synapse-version">-</div>
+                <div class="label">Synapse Version</div>
+            </div>
+        </div>
+
+        <div class="install-section">
+            <h2>📦 Quick Start</h2>
+            <p>Add this Helm repository and install the chart:</p>
+            <div class="code-block">
+                <code># Add repository
+helm repo add matrix-synapse https://ludolac.github.io/matrix-synapse-stack/
+helm repo update
+
+# Install chart
+helm install matrix-synapse matrix-synapse/matrix-synapse \
+  --namespace matrix \
+  --create-namespace \
+  --values values.yaml</code>
+            </div>
+            <p style="margin-top: 20px;">
+                📚 <a href="https://github.com/ludolac/matrix-synapse-stack" style="color: #667eea; font-weight: 500;">View Documentation on GitHub</a>
+            </p>
+        </div>
+
+        <div class="versions-section">
+            <h2>📋 Release History</h2>
+            <div id="versions-list" class="loading">
+                Loading versions...
+            </div>
+        </div>
+
+        <footer>
+            <p>
+                Maintained by <strong>WAADOO</strong> |
+                <a href="https://github.com/ludolac/matrix-synapse-stack">GitHub Repository</a> |
+                <a href="https://github.com/ludolac/matrix-synapse-stack/issues">Report Issues</a>
+            </p>
+            <p style="margin-top: 10px; opacity: 0.7; font-size: 0.9rem;">
+                Licensed under MIT License
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        async function loadVersions() {
+            try {
+                const response = await fetch('index.yaml');
+                const yamlText = await response.text();
+
+                // Parse YAML (simple parser for our use case)
+                const versions = [];
+                const lines = yamlText.split('\n');
+                let currentVersion = null;
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+
+                    if (line.includes('appVersion:')) {
+                        const appVersion = line.split(':')[1].trim();
+                        if (currentVersion) currentVersion.appVersion = appVersion;
+                    }
+
+                    if (line.includes('created:')) {
+                        const created = line.split('created:')[1].trim().replace(/"/g, '');
+                        if (currentVersion) currentVersion.created = created;
+                    }
+
+                    if (line.includes('version:') && !line.includes('apiVersion:') && !line.includes('appVersion:')) {
+                        if (currentVersion) {
+                            versions.push(currentVersion);
+                        }
+                        currentVersion = {
+                            version: line.split(':')[1].trim()
+                        };
+                    }
+                }
+
+                if (currentVersion) {
+                    versions.push(currentVersion);
+                }
+
+                displayVersions(versions);
+                updateStats(versions);
+
+            } catch (error) {
+                console.error('Error loading versions:', error);
+                document.getElementById('versions-list').innerHTML =
+                    '<div class="error">Failed to load versions. Please try again later.</div>';
+            }
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function displayVersions(versions) {
+            const versionsList = document.getElementById('versions-list');
+
+            if (versions.length === 0) {
+                versionsList.innerHTML = '<p>No versions available.</p>';
+                return;
+            }
+
+            let html = '';
+            versions.forEach((version, index) => {
+                const isLatest = index === 0;
+                html += `
+                    <div class="version-card">
+                        <div class="version-header">
+                            <div>
+                                <span class="version-number">v${version.version}</span>
+                                ${isLatest ? '<span class="badge badge-latest">Latest</span>' : ''}
+                            </div>
+                            <div class="version-badges">
+                                <span class="badge badge-app">Synapse ${version.appVersion}</span>
+                                <span class="version-date">${formatDate(version.created)}</span>
+                            </div>
+                        </div>
+                        <div class="version-actions">
+                            <a href="matrix-synapse-${version.version}.tgz" class="btn btn-primary" download>
+                                ⬇️ Download Chart
+                            </a>
+                            <a href="https://github.com/ludolac/matrix-synapse-stack/releases/tag/v${version.version}"
+                               class="btn btn-secondary" target="_blank" rel="noopener">
+                                📝 Release Notes
+                            </a>
+                        </div>
+                    </div>
+                `;
+            });
+
+            versionsList.innerHTML = html;
+        }
+
+        function updateStats(versions) {
+            document.getElementById('total-versions').textContent = versions.length;
+            if (versions.length > 0) {
+                document.getElementById('latest-version').textContent = 'v' + versions[0].version;
+                document.getElementById('synapse-version').textContent = 'v' + versions[0].appVersion;
+            }
+        }
+
+        // Load versions on page load
+        loadVersions();
+    </script>
+</body>
+</html>
