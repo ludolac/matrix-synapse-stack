@@ -1124,17 +1124,22 @@ except Exception as e:
         print_info "Fetching messages (limit: ${MESSAGE_LIMIT})..."
         MESSAGES_RESPONSE=$(kubectl exec deployment/${RELEASE_NAME}-synapse -n ${NAMESPACE} -- \
             curl -s -X GET "http://localhost:8008/_matrix/client/r0/rooms/${ENCODED_ROOM_ID}/messages?limit=${MESSAGE_LIMIT}&dir=b" \
-            -H "Authorization: Bearer ${ACCESS_TOKEN}" 2>/dev/null)
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" 2>&1)
 
         # Extract chunk array from messages response
         MESSAGES_JSON=$(echo "$MESSAGES_RESPONSE" | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
-    print(json.dumps(data.get('chunk', [])))
-except:
+    chunk = data.get('chunk', [])
+    if len(chunk) == 0 and 'errcode' in data:
+        # Log error to stderr so user can see it
+        print(f\"WARNING: Failed to fetch messages: {data.get('error', 'Unknown error')}\", file=sys.stderr)
+    print(json.dumps(chunk))
+except Exception as e:
+    print(f\"WARNING: Failed to parse messages response: {e}\", file=sys.stderr)
     print('[]')
-" 2>/dev/null || echo '[]')
+" 2>&1 || echo '[]')
     fi
 
     # Create export JSON using Python to ensure proper JSON formatting
