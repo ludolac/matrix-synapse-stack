@@ -8,7 +8,7 @@ Comprehensive utility scripts for managing Matrix Synapse deployment, secrets, u
 - [Quick Start Guide](#quick-start-guide)
 - [Script Documentation](#script-documentation)
   - [generate-secrets.sh](#generate-secretssh)
-  - [create-user.sh](#create-usersh)
+  - [matrix-admin.sh](#matrix-adminsh)
   - [backup.sh](#backupsh)
   - [restore.sh](#restoresh)
   - [setup-authelia-sso.sh](#setup-authelia-ssosh)
@@ -23,7 +23,7 @@ Comprehensive utility scripts for managing Matrix Synapse deployment, secrets, u
 | Script | Purpose | Use Case |
 |--------|---------|----------|
 | **generate-secrets.sh** | Generate PostgreSQL & admin credentials | Initial setup, secret rotation |
-| **create-user.sh** | Create Matrix users | Add users after deployment |
+| **matrix-admin.sh** | Comprehensive user & room management | Add users, manage rooms after deployment |
 | **backup.sh** | Full backup (DB + media + keys) | Disaster recovery, migrations |
 | **restore.sh** | Restore from backup | Disaster recovery, cloning |
 | **setup-authelia-sso.sh** | Configure Authelia SSO integration | SSO/OIDC setup |
@@ -42,7 +42,7 @@ Comprehensive utility scripts for managing Matrix Synapse deployment, secrets, u
 helm install matrix-synapse . -n matrix -f values-prod.yaml
 
 # 3. Create additional users
-./scripts/create-user.sh -u alice -e alice@example.com
+./scripts/matrix-admin.sh create -u alice -e alice@example.com
 ```
 
 ### Backup & Restore
@@ -182,7 +182,7 @@ Credentials are saved to `.secrets/` (gitignored):
 .secrets/
 ├── postgresql-credentials.txt      # Database password
 ├── admin-credentials.txt            # Admin username, password, reg secret
-└── users/                           # User credentials (from create-user.sh)
+└── users/                           # User credentials (from matrix-admin.sh)
     ├── alice.txt
     └── bob.txt
 ```
@@ -221,24 +221,34 @@ kubectl rollout restart statefulset/matrix-synapse-postgresql -n matrix
 
 ---
 
-## create-user.sh
+## matrix-admin.sh
 
-**Manage Matrix users on a running Synapse deployment - create, list, and delete users**
+**Comprehensive Matrix Synapse administration tool for user and room management**
 
 ### Synopsis
 
 ```bash
-./scripts/create-user.sh <command> [options]
+./scripts/matrix-admin.sh <command> [options]
 ```
 
-### Commands
+### User Management Commands
 
 ```bash
 create              Create a new user
 list                List all users on the server
+info                Show detailed user information (including joined rooms)
 delete              Delete a user (permanently erase account and data)
 update-password     Update a user's password
 deactivate          Deactivate a user account (keeps data, prevents login)
+```
+
+### Room Management Commands
+
+```bash
+room-list           List all rooms on the server
+room-info           Show detailed room information
+room-create         Create a new room
+room-delete         Delete a room
 ```
 
 ### Create User Options
@@ -286,6 +296,40 @@ deactivate          Deactivate a user account (keeps data, prevents login)
 -h, --help                 Show help message
 ```
 
+### Room List Options
+
+```bash
+--limit LIMIT              Maximum number of rooms to display (default: 100)
+--order-by ORDER          Sort order: name, size, joined_members (default: name)
+-h, --help                Show help message
+```
+
+### Room Info Options
+
+```bash
+-r, --room ROOM_ID        Room ID to query (required)
+-h, --help                Show help message
+```
+
+### Room Create Options
+
+```bash
+-n, --name NAME           Room name (required)
+-t, --topic TOPIC         Room topic (optional)
+-a, --alias ALIAS         Room alias (optional, without # or :domain)
+--public                  Make room publicly joinable (default: private)
+-h, --help                Show help message
+```
+
+### Room Delete Options
+
+```bash
+-r, --room ROOM_ID        Room ID to delete (required)
+-y, --yes                 Skip confirmation prompt
+--purge                   Purge room history from database (default: false)
+-h, --help                Show help message
+```
+
 ### Environment Variables
 
 ```bash
@@ -297,73 +341,118 @@ RELEASE_NAME           Helm release name (default: matrix-synapse)
 
 **Create basic user:**
 ```bash
-./scripts/create-user.sh create -u alice -e alice@example.com
+./scripts/matrix-admin.sh create -u alice -e alice@example.com
 ```
 
 **Create admin user:**
 ```bash
-./scripts/create-user.sh create -u admin2 -e admin2@example.com -a
+./scripts/matrix-admin.sh create -u admin2 -e admin2@example.com -a
 ```
 
 **Create user with custom password:**
 ```bash
-./scripts/create-user.sh create -u bob -p MySecurePass123! -e bob@example.com
+./scripts/matrix-admin.sh create -u bob -p MySecurePass123! -e bob@example.com
 ```
 
 **Create user with display name:**
 ```bash
-./scripts/create-user.sh create -u charlie -d "Charlie Brown" -e charlie@example.com
+./scripts/matrix-admin.sh create -u charlie -d "Charlie Brown" -e charlie@example.com
 ```
 
 **List all users:**
 ```bash
-./scripts/create-user.sh list
+./scripts/matrix-admin.sh list
+```
+
+**Show detailed user information:**
+```bash
+./scripts/matrix-admin.sh info -u alice
 ```
 
 **List only admin users:**
 ```bash
-./scripts/create-user.sh list --admins
+./scripts/matrix-admin.sh list --admins
 ```
 
 **List only deactivated users:**
 ```bash
-./scripts/create-user.sh list --deactivated
+./scripts/matrix-admin.sh list --deactivated
 ```
 
 **Delete a user (with confirmation):**
 ```bash
-./scripts/create-user.sh delete -u john
+./scripts/matrix-admin.sh delete -u john
 ```
 
 **Delete user without confirmation:**
 ```bash
-./scripts/create-user.sh delete -u john -y
+./scripts/matrix-admin.sh delete -u john -y
 ```
 
 **Update user password (auto-generated):**
 ```bash
-./scripts/create-user.sh update-password -u alice
+./scripts/matrix-admin.sh update-password -u alice
 ```
 
 **Update user password (custom password):**
 ```bash
-./scripts/create-user.sh update-password -u alice -p NewSecurePass456!
+./scripts/matrix-admin.sh update-password -u alice -p NewSecurePass456!
 ```
 
 **Deactivate user (keeps data):**
 ```bash
-./scripts/create-user.sh deactivate -u bob
+./scripts/matrix-admin.sh deactivate -u bob
 ```
 
 **Deactivate without confirmation:**
 ```bash
-./scripts/create-user.sh deactivate -u bob -y
+./scripts/matrix-admin.sh deactivate -u bob -y
+```
+
+**List all rooms:**
+```bash
+./scripts/matrix-admin.sh room-list
+```
+
+**List rooms with custom limit:**
+```bash
+./scripts/matrix-admin.sh room-list --limit 50
+```
+
+**List rooms sorted by member count:**
+```bash
+./scripts/matrix-admin.sh room-list --order-by joined_members
+```
+
+**Show room details:**
+```bash
+./scripts/matrix-admin.sh room-info -r '!AbCdEfG:matrix.example.com'
+```
+
+**Create a private room:**
+```bash
+./scripts/matrix-admin.sh room-create -n "Team Chat" -t "Internal team discussion"
+```
+
+**Create a public room with alias:**
+```bash
+./scripts/matrix-admin.sh room-create -n "Community" -a general --public
+```
+
+**Delete a room (with confirmation):**
+```bash
+./scripts/matrix-admin.sh room-delete -r '!AbCdEfG:matrix.example.com'
+```
+
+**Delete room and purge history:**
+```bash
+./scripts/matrix-admin.sh room-delete -r '!AbCdEfG:matrix.example.com' --purge -y
 ```
 
 **Use custom namespace:**
 ```bash
-NAMESPACE=my-matrix ./scripts/create-user.sh list
-NAMESPACE=my-matrix ./scripts/create-user.sh update-password -u alice
+NAMESPACE=my-matrix ./scripts/matrix-admin.sh list
+NAMESPACE=my-matrix ./scripts/matrix-admin.sh room-list
 ```
 
 ### What It Does
@@ -382,6 +471,13 @@ NAMESPACE=my-matrix ./scripts/create-user.sh update-password -u alice
 3. **Parses** JSON response (uses Python if available, falls back to grep)
 4. **Displays** formatted table with: Username, Admin status, Guest status, Active/Deactivated
 5. **Supports** filtering by admin, guest, or deactivated status
+
+**Info Command:**
+1. **Authenticates** using admin credentials from Kubernetes secret
+2. **Fetches** user details via Synapse Admin API (`/_synapse/admin/v2/users/<user>`)
+3. **Fetches** joined rooms via Admin API (`/_synapse/admin/v1/users/<user>/joined_rooms`)
+4. **Parses** JSON responses using Python (if available)
+5. **Displays** detailed information: Full User ID, Display Name, Admin status, User Type, Deactivated status, Creation Time, Joined Rooms count, List of room IDs
 
 **Delete Command:**
 1. **Confirms** deletion with user (unless `-y` flag provided)
@@ -407,6 +503,35 @@ NAMESPACE=my-matrix ./scripts/create-user.sh update-password -u alice
 5. **Logs out** user from all sessions and prevents future logins
 6. **Marks** local credential file as deactivated (keeps file for records)
 7. **Note:** Username remains reserved and cannot be reused (Synapse limitation)
+
+**Room List Command:**
+1. **Authenticates** using admin credentials from Kubernetes secret
+2. **Fetches** room list via Synapse Admin API (`/_synapse/admin/v1/rooms`)
+3. **Supports** pagination (--limit) and sorting (--order-by)
+4. **Parses** JSON response using Python (if available)
+5. **Displays** formatted table with: Room ID, Room Name, Member Count
+6. **Shows** total room count
+
+**Room Info Command:**
+1. **Authenticates** using admin credentials from Kubernetes secret
+2. **Fetches** room details via Synapse Admin API (`/_synapse/admin/v1/rooms/<room_id>`)
+3. **Parses** JSON response using Python (if available)
+4. **Displays** detailed information: Room ID, Name, Topic, Creator, Member Count, Public status, Encryption type
+
+**Room Create Command:**
+1. **Authenticates** using admin credentials from Kubernetes secret
+2. **Constructs** room creation request with name, topic, alias, visibility
+3. **Creates** room via Matrix Client API (`/_matrix/client/r0/createRoom`)
+4. **Returns** room ID and alias (if specified)
+5. **Sets** admin user as room creator
+
+**Room Delete Command:**
+1. **Confirms** deletion with user (unless `-y` flag provided)
+2. **Authenticates** using admin credentials from Kubernetes secret
+3. **Deletes** room via Synapse Admin API (`/_synapse/admin/v2/rooms/<room_id>`)
+4. **Blocks** room to prevent re-creation
+5. **Optionally** purges room history from database (--purge flag)
+6. **Kicks** all members from room
 
 ### Output
 
@@ -593,7 +718,7 @@ kubectl get secret matrix-synapse-admin-credentials -n matrix -o yaml
 ```
 # API returns error when user doesn't exist
 ```
-**Solution:** Use `./scripts/create-user.sh list` to verify username
+**Solution:** Use `./scripts/matrix-admin.sh list` to verify username
 
 **Username already taken (after deletion):**
 ```
@@ -1131,8 +1256,8 @@ kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=matrix-synapse 
 cat .secrets/admin-credentials.txt
 
 # 5. Create additional users
-./scripts/create-user.sh -u alice -e alice@example.com
-./scripts/create-user.sh -u bob -e bob@example.com -a
+./scripts/matrix-admin.sh create -u alice -e alice@example.com
+./scripts/matrix-admin.sh create -u bob -e bob@example.com -a
 
 # 6. Create first backup
 ./scripts/backup.sh
@@ -1353,7 +1478,7 @@ Recreate? (y/N):
 
 ✅ **DO:**
 - Use admin accounts only for administration
-- Create regular users with `create-user.sh`
+- Create regular users with `matrix-admin.sh`
 - Enable 2FA/MFA for admin accounts
 - Regularly audit user accounts
 - Remove inactive users
@@ -1403,13 +1528,13 @@ For issues or questions:
 
 ## Script Compatibility
 
-| Script | Kubernetes | Helm | kubectl | jq |
-|--------|------------|------|---------|-----|
-| generate-secrets.sh | 1.24+ | 3.8+ | ✅ | ❌ |
-| create-user.sh | 1.24+ | 3.8+ | ✅ | ❌ |
-| backup.sh | 1.24+ | - | ✅ | ❌ |
-| restore.sh | 1.24+ | - | ✅ | ❌ |
-| setup-authelia-sso.sh | 1.24+ | - | ✅ | ❌ |
+| Script | Kubernetes | Helm | kubectl | jq | python3 |
+|--------|------------|------|---------|-----|---------|
+| generate-secrets.sh | 1.24+ | 3.8+ | ✅ | ❌ | ❌ |
+| matrix-admin.sh | 1.24+ | 3.8+ | ✅ | ❌ | Optional (recommended for formatted output) |
+| backup.sh | 1.24+ | - | ✅ | ❌ | ❌ |
+| restore.sh | 1.24+ | - | ✅ | ❌ | ❌ |
+| setup-authelia-sso.sh | 1.24+ | - | ✅ | ❌ | ❌ |
 
 ---
 
