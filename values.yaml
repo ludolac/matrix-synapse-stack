@@ -519,7 +519,34 @@ postgresql:
     # Synapse requires these settings
     walLevel: "minimal"
     maxWalSenders: 0
-    logMinDurationStatement: 1000
+
+    # Logging configuration
+    # Log queries slower than this (milliseconds). -1 = disabled, 0 = all queries
+    logMinDurationStatement: 1000  # Log queries taking > 1 second
+
+    # Connection logging
+    logConnections: true           # Log new connections
+    logDisconnections: true        # Log disconnections
+
+    # Statement logging level
+    # Options: debug5, debug4, debug3, debug2, debug1, info, notice, warning, error, log, fatal, panic
+    logStatementLevel: "notice"    # Minimum level to log (notice = default, quiet)
+
+    # What types of statements to log
+    # Options: none, ddl (schema changes), mod (data modifications), all
+    logStatement: "none"           # Log statement types (none = quiet, recommended for production)
+
+    # Error detail level
+    # Options: terse, default, verbose
+    logErrorVerbosity: "default"   # Error message detail level
+
+    # Log line prefix format
+    logLinePrefix: "%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h "
+
+    # Additional logging options
+    logLockWaits: false            # Log when session waits longer than deadlock_timeout
+    logTempFiles: -1               # Log temp files larger than this (KB). -1 = disabled
+    logAutovacuumMinDuration: -1   # Log autovacuum activity slower than this (ms). -1 = disabled
 
 # Coturn TURN Server Configuration
 # Integrated TURN server for WebRTC video/voice calls
@@ -534,7 +561,7 @@ coturn:
   # Coturn container image
   image:
     repository: coturn/coturn
-    tag: "4.6-alpine"
+    tag: "4.7-alpine"
     pullPolicy: IfNotPresent
   
   imagePullSecrets: []

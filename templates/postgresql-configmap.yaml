@@ -28,11 +28,52 @@ data:
     random_page_cost = 1.1
     effective_io_concurrency = 200
 
-    # Logging
+    # Logging Configuration
+    # Slow query logging
     log_min_duration_statement = {{ .Values.postgresql.config.logMinDurationStatement }}
+
+    # Connection logging
+    {{- if .Values.postgresql.config.logConnections }}
     log_connections = on
+    {{- else }}
+    log_connections = off
+    {{- end }}
+    {{- if .Values.postgresql.config.logDisconnections }}
     log_disconnections = on
-    log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+    {{- else }}
+    log_disconnections = off
+    {{- end }}
+
+    # Statement logging
+    {{- if .Values.postgresql.config.logStatement }}
+    log_statement = '{{ .Values.postgresql.config.logStatement }}'
+    {{- end }}
+
+    # Log level and verbosity
+    {{- if .Values.postgresql.config.logStatementLevel }}
+    log_min_messages = {{ .Values.postgresql.config.logStatementLevel }}
+    {{- end }}
+    {{- if .Values.postgresql.config.logErrorVerbosity }}
+    log_error_verbosity = {{ .Values.postgresql.config.logErrorVerbosity }}
+    {{- end }}
+
+    # Log line format
+    {{- if .Values.postgresql.config.logLinePrefix }}
+    log_line_prefix = '{{ .Values.postgresql.config.logLinePrefix }}'
+    {{- end }}
+
+    # Additional logging options
+    {{- if .Values.postgresql.config.logLockWaits }}
+    log_lock_waits = on
+    {{- else }}
+    log_lock_waits = off
+    {{- end }}
+    {{- if .Values.postgresql.config.logTempFiles }}
+    log_temp_files = {{ .Values.postgresql.config.logTempFiles }}
+    {{- end }}
+    {{- if .Values.postgresql.config.logAutovacuumMinDuration }}
+    log_autovacuum_min_duration = {{ .Values.postgresql.config.logAutovacuumMinDuration }}
+    {{- end }}
 
     # Locale and Encoding
     lc_messages = 'C'
