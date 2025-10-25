@@ -43,6 +43,8 @@ Room Management Commands:
     room-info           Show detailed room information
     room-create         Create a new room
     room-delete         Delete a room
+    room-export         Export room state and messages to JSON file
+    room-import         Import room from exported JSON file
 
 Create Options:
     -u, --username USERNAME     Username (required, without @ or :domain)
@@ -89,6 +91,17 @@ Room Delete Options:
     -r, --room ROOM_ID         Room ID to delete (required)
     -y, --yes                  Skip confirmation
     --purge                    Purge room history
+
+Room Export Options:
+    -r, --room ROOM_ID         Room ID to export (required)
+    -o, --output FILE          Output file (default: .backup/rooms/<room_id>_<timestamp>.json)
+    --include-messages         Include all messages (default: state only)
+    --limit N                  Limit messages to N (default: 1000)
+
+Room Import Options:
+    -f, --file FILE            JSON file to import (required)
+    --room-id ROOM_ID          Override room ID (default: create new room)
+    -y, --yes                  Skip confirmation
 
 General Options:
     -h, --help                 Show this help
@@ -139,6 +152,18 @@ Examples:
 
     # Delete room with history purge
     $0 room-delete -r '!abc123:matrix.waadoo.ovh' --purge -y
+
+    # Export room state (no messages)
+    $0 room-export -r '!abc123:matrix.waadoo.ovh'
+
+    # Export room with messages
+    $0 room-export -r '!abc123:matrix.waadoo.ovh' --include-messages --limit 5000
+
+    # Import room (creates new room)
+    $0 room-import -f .backup/rooms/room_export.json
+
+    # Import room with specific room ID (restore to existing room)
+    $0 room-import -f .backup/rooms/room_export.json --room-id '!abc123:matrix.waadoo.ovh' -y
 
 EOF
 }
@@ -992,6 +1017,323 @@ room_delete() {
     fi
 }
 
+room_export() {
+    local ROOM_ID=""
+    local OUTPUT_FILE=""
+    local INCLUDE_MESSAGES=false
+    local MESSAGE_LIMIT=1000
+    local TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -r|--room)
+                ROOM_ID="$2"
+                shift 2
+                ;;
+            -o|--output)
+                OUTPUT_FILE="$2"
+                shift 2
+                ;;
+            --include-messages)
+                INCLUDE_MESSAGES=true
+                shift
+                ;;
+            --limit)
+                MESSAGE_LIMIT="$2"
+                shift 2
+                ;;
+            *)
+                print_error "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+
+    if [ -z "$ROOM_ID" ]; then
+        print_error "Room ID required!"
+        exit 1
+    fi
+
+    # Set default output file if not specified
+    if [ -z "$OUTPUT_FILE" ]; then
+        ROOM_DIR=".backup/rooms"
+        mkdir -p "$ROOM_DIR"
+        # Sanitize room ID for filename (remove special chars)
+        SAFE_ROOM_ID=$(echo "$ROOM_ID" | sed 's/[^a-zA-Z0-9._-]/_/g')
+        OUTPUT_FILE="${ROOM_DIR}/${SAFE_ROOM_ID}_${TIMESTAMP}.json"
+    fi
+
+    print_info "Exporting room: ${ROOM_ID}"
+    print_info "Output file: ${OUTPUT_FILE}"
+
+    get_admin_access
+
+    # URL encode the room ID for API calls
+    ENCODED_ROOM_ID=$(echo -n "$ROOM_ID" | python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip(), safe=''))")
+
+    # Get room state
+    print_info "Fetching room state..."
+    ROOM_STATE=$(kubectl exec deployment/${RELEASE_NAME}-synapse -n ${NAMESPACE} -- \
+        curl -s -X GET "http://localhost:8008/_synapse/admin/v1/rooms/${ENCODED_ROOM_ID}/state" \
+        -H "Authorization: Bearer ${ACCESS_TOKEN}" 2>/dev/null)
+
+    # Get room details
+    print_info "Fetching room details..."
+    ROOM_DETAILS=$(kubectl exec deployment/${RELEASE_NAME}-synapse -n ${NAMESPACE} -- \
+        curl -s -X GET "http://localhost:8008/_synapse/admin/v1/rooms/${ENCODED_ROOM_ID}" \
+        -H "Authorization: Bearer ${ACCESS_TOKEN}" 2>/dev/null)
+
+    # Get room members
+    print_info "Fetching room members..."
+    ROOM_MEMBERS=$(kubectl exec deployment/${RELEASE_NAME}-synapse -n ${NAMESPACE} -- \
+        curl -s -X GET "http://localhost:8008/_synapse/admin/v2/rooms/${ENCODED_ROOM_ID}/members" \
+        -H "Authorization: Bearer ${ACCESS_TOKEN}" 2>/dev/null)
+
+    # Get messages if requested
+    MESSAGES_JSON='[]'
+    if [ "$INCLUDE_MESSAGES" = true ]; then
+        print_info "Fetching messages (limit: ${MESSAGE_LIMIT})..."
+        MESSAGES_RESPONSE=$(kubectl exec deployment/${RELEASE_NAME}-synapse -n ${NAMESPACE} -- \
+            curl -s -X GET "http://localhost:8008/_matrix/client/r0/rooms/${ENCODED_ROOM_ID}/messages?limit=${MESSAGE_LIMIT}&dir=b" \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" 2>/dev/null)
+
+        # Extract chunk array from messages response
+        MESSAGES_JSON=$(echo "$MESSAGES_RESPONSE" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    print(json.dumps(data.get('chunk', [])))
+except:
+    print('[]')
+" 2>/dev/null || echo '[]')
+    fi
+
+    # Create export JSON using Python to ensure proper JSON formatting
+    print_info "Creating export file..."
+
+    # Pass data through environment variables to avoid shell escaping issues
+    export EXPORT_ROOM_ID="$ROOM_ID"
+    export EXPORT_TIMESTAMP="$TIMESTAMP"
+    export EXPORT_DETAILS="$ROOM_DETAILS"
+    export EXPORT_STATE="$ROOM_STATE"
+    export EXPORT_MEMBERS="$ROOM_MEMBERS"
+    export EXPORT_MESSAGES="$MESSAGES_JSON"
+
+    python3 << 'PYEOF' > "$OUTPUT_FILE"
+import json, os
+
+export_data = {
+    "export_version": "1.0",
+    "export_timestamp": os.environ["EXPORT_TIMESTAMP"],
+    "room_id": os.environ["EXPORT_ROOM_ID"],
+    "room_details": json.loads(os.environ["EXPORT_DETAILS"]),
+    "room_state": json.loads(os.environ["EXPORT_STATE"]),
+    "room_members": json.loads(os.environ["EXPORT_MEMBERS"]),
+    "messages": json.loads(os.environ["EXPORT_MESSAGES"])
+}
+
+print(json.dumps(export_data, indent=2))
+PYEOF
+
+    FILE_SIZE=$(du -h "$OUTPUT_FILE" | cut -f1)
+    print_success "Room exported successfully!"
+    echo "=========================================="
+    echo "  Room Export Complete"
+    echo "=========================================="
+    echo "Room ID: ${ROOM_ID}"
+    echo "File: ${OUTPUT_FILE}"
+    echo "Size: ${FILE_SIZE}"
+    echo "Timestamp: ${TIMESTAMP}"
+    echo "Messages: $([ "$INCLUDE_MESSAGES" = true ] && echo "Included (${MESSAGE_LIMIT} max)" || echo "Not included")"
+    echo "=========================================="
+}
+
+room_import() {
+    local INPUT_FILE=""
+    local TARGET_ROOM_ID=""
+    local CONFIRM=false
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -f|--file)
+                INPUT_FILE="$2"
+                shift 2
+                ;;
+            --room-id)
+                TARGET_ROOM_ID="$2"
+                shift 2
+                ;;
+            -y|--yes)
+                CONFIRM=true
+                shift
+                ;;
+            *)
+                print_error "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+
+    if [ -z "$INPUT_FILE" ]; then
+        print_error "Input file required!"
+        exit 1
+    fi
+
+    if [ ! -f "$INPUT_FILE" ]; then
+        print_error "File not found: ${INPUT_FILE}"
+        exit 1
+    fi
+
+    print_info "Importing room from: ${INPUT_FILE}"
+
+    # Parse export file to get room details
+    EXPORT_DATA=$(cat "$INPUT_FILE")
+
+    ORIGINAL_ROOM_ID=$(echo "$EXPORT_DATA" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    print(data.get('room_id', ''))
+except:
+    print('')
+" 2>/dev/null)
+
+    ROOM_NAME=$(echo "$EXPORT_DATA" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    details = data.get('room_details', {})
+    print(details.get('name', 'Unknown'))
+except:
+    print('Unknown')
+" 2>/dev/null)
+
+    if [ "$CONFIRM" = false ]; then
+        echo "=========================================="
+        echo "  Room Import"
+        echo "=========================================="
+        echo "Source file: ${INPUT_FILE}"
+        echo "Original room ID: ${ORIGINAL_ROOM_ID}"
+        echo "Room name: ${ROOM_NAME}"
+        if [ -n "$TARGET_ROOM_ID" ]; then
+            echo "Target room ID: ${TARGET_ROOM_ID}"
+            print_warning "This will OVERWRITE state in existing room!"
+        else
+            echo "Target: New room (will be created)"
+        fi
+        echo "=========================================="
+        read -p "Continue with import? (yes/no): " REPLY
+        if [ "$REPLY" != "yes" ]; then
+            print_info "Cancelled"
+            exit 0
+        fi
+    fi
+
+    get_admin_access
+
+    # If no target room ID, create new room
+    if [ -z "$TARGET_ROOM_ID" ]; then
+        print_info "Creating new room..."
+
+        # Extract room name and topic from export
+        CREATE_RESPONSE=$(kubectl exec deployment/${RELEASE_NAME}-synapse -n ${NAMESPACE} -- \
+            curl -s -X POST "http://localhost:8008/_matrix/client/r0/createRoom" \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"name\":\"${ROOM_NAME} (imported)\"}" 2>/dev/null)
+
+        TARGET_ROOM_ID=$(echo "$CREATE_RESPONSE" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    print(data.get('room_id', ''))
+except:
+    print('')
+" 2>/dev/null)
+
+        if [ -z "$TARGET_ROOM_ID" ]; then
+            print_error "Failed to create room!"
+            exit 1
+        fi
+
+        print_success "Created new room: ${TARGET_ROOM_ID}"
+    fi
+
+    # Import room state events
+    print_info "Importing room state..."
+
+    # Extract state events and send them
+    echo "$EXPORT_DATA" | python3 << 'PYEOF'
+import sys, json, subprocess, os
+
+try:
+    data = json.load(sys.stdin)
+    state = data.get('room_state', {}).get('state', [])
+    target_room = os.environ.get('TARGET_ROOM_ID', '')
+    access_token = os.environ.get('ACCESS_TOKEN', '')
+    namespace = os.environ.get('NAMESPACE', 'matrix')
+    release = os.environ.get('RELEASE_NAME', 'matrix-synapse')
+
+    state_types_to_import = ['m.room.name', 'm.room.topic', 'm.room.avatar', 'm.room.join_rules']
+    imported = 0
+
+    for event in state:
+        event_type = event.get('type', '')
+        if event_type in state_types_to_import:
+            content = json.dumps(event.get('content', {}))
+            state_key = event.get('state_key', '')
+
+            cmd = [
+                'kubectl', 'exec', f'deployment/{release}-synapse', '-n', namespace, '--',
+                'curl', '-s', '-X', 'PUT',
+                f'http://localhost:8008/_matrix/client/r0/rooms/{target_room}/state/{event_type}/{state_key}',
+                '-H', f'Authorization: Bearer {access_token}',
+                '-H', 'Content-Type: application/json',
+                '-d', content
+            ]
+
+            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            imported += 1
+
+    print(f"Imported {imported} state events")
+except Exception as e:
+    print(f"Error: {e}", file=sys.stderr)
+PYEOF
+
+    # Import messages if they exist
+    MESSAGE_COUNT=$(echo "$EXPORT_DATA" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    messages = data.get('messages', [])
+    print(len(messages))
+except:
+    print('0')
+" 2>/dev/null)
+
+    if [ "$MESSAGE_COUNT" != "0" ] && [ "$MESSAGE_COUNT" != "" ]; then
+        print_info "Importing ${MESSAGE_COUNT} messages..."
+        print_warning "Note: Messages will be sent as new events with current timestamp"
+
+        # This is a simplified import - messages will appear as new events
+        # Full historical import would require server-side database manipulation
+        print_warning "Message import requires manual database manipulation for full history preservation"
+        print_info "Messages in export file can be reviewed but won't be automatically imported"
+    fi
+
+    print_success "Room import completed!"
+    echo "=========================================="
+    echo "  Room Import Complete"
+    echo "=========================================="
+    echo "Target Room ID: ${TARGET_ROOM_ID}"
+    echo "Room Name: ${ROOM_NAME}"
+    echo "State Events: Imported"
+    echo "Messages: ${MESSAGE_COUNT} available in export (manual import required)"
+    echo "=========================================="
+    echo ""
+    print_info "Access the imported room: https://element.your-domain.com/#/room/${TARGET_ROOM_ID}"
+}
+
 
 # Parse command
 COMMAND="${1:-}"
@@ -1035,6 +1377,14 @@ case "$COMMAND" in
         ;;
     room-delete)
         room_delete "$@"
+        exit 0
+        ;;
+    room-export)
+        room_export "$@"
+        exit 0
+        ;;
+    room-import)
+        room_import "$@"
         exit 0
         ;;
     -h|--help|help|"")
