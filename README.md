@@ -1,6 +1,10 @@
-# Matrix Synapse Helm Chart
+<div align="center">
+  <img src="https://matrix.org/images/matrix-logo.svg" alt="Matrix Logo" width="200"/>
 
-Production-ready Helm chart for deploying Matrix Synapse homeserver with Element Web client on Kubernetes.
+  # Matrix Synapse Helm Chart
+
+  Production-ready Helm chart for deploying Matrix Synapse homeserver with Element Web client on Kubernetes.
+</div>
 
 [![Helm Chart](https://img.shields.io/badge/helm-chart-blue)](https://ludolac.github.io/matrix-synapse-stack/)
 [![Chart Version](https://img.shields.io/badge/dynamic/yaml?url=https://ludolac.github.io/matrix-synapse-stack/index.yaml&query=$.entries.matrix-synapse[0].version&label=chart&color=0F1689&logo=helm)](https://ludolac.github.io/matrix-synapse-stack/)
