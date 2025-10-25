@@ -190,17 +190,34 @@ fi
 
 # 4. Backup Kubernetes Secrets
 log_info "Backing up Kubernetes secrets..."
-kubectl get secret -n "${NAMESPACE}" matrix-synapse-postgresql -o yaml > \
-    "${BACKUP_PATH}/secrets/postgresql-secret.yaml" 2>/dev/null || {
-    log_warning "PostgreSQL secret not found"
-}
 
-kubectl get secret -n "${NAMESPACE}" matrix-synapse-admin-credentials -o yaml > \
-    "${BACKUP_PATH}/secrets/admin-credentials-secret.yaml" 2>/dev/null || {
-    log_warning "Admin credentials secret not found"
-}
+# Automatically find all Matrix-related secrets (excluding Helm release secrets)
+SECRETS=$(kubectl get secrets -n "${NAMESPACE}" -o name 2>/dev/null | \
+    grep -E "matrix-synapse|matrix-element|coturn" | \
+    grep -v "sh.helm.release" | \
+    sed 's/secret\///')
 
-log_success "Kubernetes secrets backup completed"
+if [ -z "$SECRETS" ]; then
+    log_warning "No Matrix-related secrets found in namespace ${NAMESPACE}"
+else
+    BACKED_UP=0
+    for secret_name in $SECRETS; do
+        # Sanitize filename (replace special chars with -)
+        file_name=$(echo "${secret_name}.yaml" | tr '/' '-')
+
+        if kubectl get secret -n "${NAMESPACE}" "${secret_name}" -o yaml > \
+            "${BACKUP_PATH}/secrets/${file_name}" 2>/dev/null; then
+            SECRET_SIZE=$(stat -f%z "${BACKUP_PATH}/secrets/${file_name}" 2>/dev/null || \
+                          stat -c%s "${BACKUP_PATH}/secrets/${file_name}" 2>/dev/null || echo "0")
+            log_info "  ✓ ${secret_name} (${SECRET_SIZE} bytes)"
+            BACKED_UP=$((BACKED_UP + 1))
+        else
+            log_warning "  ✗ Failed to backup ${secret_name}"
+        fi
+    done
+
+    log_success "Kubernetes secrets backup completed (${BACKED_UP} secrets)"
+fi
 
 # 5. Create backup manifest
 log_info "Creating backup manifest..."

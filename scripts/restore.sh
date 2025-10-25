@@ -159,21 +159,51 @@ DB_USER="synapse"  # Database user
 
 log_info "Database: ${DB_NAME}, User: ${DB_USER}"
 
-# 1. Restore Kubernetes Secrets (admin credentials only)
+# 1. Restore Kubernetes Secrets
 # Note: We DO NOT restore the PostgreSQL secret because:
 # - The database has already been created with new credentials
 # - Restoring old credentials would cause authentication failures
 # - The synapse user in the restored DB will work with new credentials
 
-log_warning "Skipping PostgreSQL secret restore (using current credentials)"
+log_info "Restoring Kubernetes secrets from backup..."
 
-if [ -f "${BACKUP_PATH}/secrets/admin-credentials-secret.yaml" ]; then
-    log_info "Restoring admin credentials secret..."
-    kubectl delete secret matrix-synapse-admin-credentials -n "${NAMESPACE}" 2>/dev/null || true
-    kubectl apply -f "${BACKUP_PATH}/secrets/admin-credentials-secret.yaml"
-    log_success "Admin credentials secret restored"
+# Find all secret YAML files in backup
+SECRET_FILES=$(find "${BACKUP_PATH}/secrets" -name "*.yaml" -type f 2>/dev/null || true)
+
+if [ -z "$SECRET_FILES" ]; then
+    log_warning "No secrets found in backup, keeping current"
 else
-    log_warning "Admin credentials secret not found in backup, keeping current"
+    RESTORED=0
+    SKIPPED=0
+
+    for secret_file in $SECRET_FILES; do
+        SECRET_NAME=$(basename "${secret_file}" .yaml)
+
+        # Skip PostgreSQL secret (explained above)
+        if echo "${SECRET_NAME}" | grep -q "postgresql"; then
+            log_info "  ⊘ Skipping ${SECRET_NAME} (using current PostgreSQL credentials)"
+            SKIPPED=$((SKIPPED + 1))
+            continue
+        fi
+
+        # Extract actual secret name from YAML
+        ACTUAL_SECRET_NAME=$(grep "^  name:" "${secret_file}" | head -1 | awk '{print $2}' || echo "")
+
+        if [ -n "$ACTUAL_SECRET_NAME" ]; then
+            log_info "  → Restoring ${ACTUAL_SECRET_NAME}..."
+            kubectl delete secret "${ACTUAL_SECRET_NAME}" -n "${NAMESPACE}" 2>/dev/null || true
+            if kubectl apply -f "${secret_file}" 2>/dev/null; then
+                log_info "    ✓ ${ACTUAL_SECRET_NAME} restored"
+                RESTORED=$((RESTORED + 1))
+            else
+                log_warning "    ✗ Failed to restore ${ACTUAL_SECRET_NAME}"
+            fi
+        else
+            log_warning "  ✗ Could not determine secret name from ${secret_file}"
+        fi
+    done
+
+    log_success "Secrets restore completed (${RESTORED} restored, ${SKIPPED} skipped)"
 fi
 
 # 2. Restore PostgreSQL Database
