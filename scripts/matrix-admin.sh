@@ -688,7 +688,7 @@ get_admin_access() {
     fi
 
     # Debug: print what we're trying
-    echo "DEBUG: Connecting to deployment/${RELEASE_NAME}-synapse in namespace ${NAMESPACE}"
+    # echo "DEBUG: Connecting to deployment/${RELEASE_NAME}-synapse in namespace ${NAMESPACE}"
 
     TOKEN_RESPONSE=$(kubectl exec deployment/${RELEASE_NAME}-synapse -n ${NAMESPACE} -- \
         curl -s -X POST http://localhost:8008/_matrix/client/r0/login \
