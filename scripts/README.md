@@ -249,6 +249,8 @@ room-list           List all rooms on the server
 room-info           Show detailed room information
 room-create         Create a new room
 room-delete         Delete a room
+room-export         Export room state and messages to JSON file
+room-import         Import room from exported JSON file
 ```
 
 ### Create User Options
@@ -327,6 +329,25 @@ room-delete         Delete a room
 -r, --room ROOM_ID        Room ID to delete (required)
 -y, --yes                 Skip confirmation prompt
 --purge                   Purge room history from database (default: false)
+-h, --help                Show help message
+```
+
+### Room Export Options
+
+```bash
+-r, --room ROOM_ID        Room ID to export (required)
+-o, --output FILE         Output file path (default: .backup/rooms/<room_id>_<timestamp>.json)
+--include-messages        Include message history in export (default: state only)
+--limit N                 Maximum number of messages to export (default: 1000)
+-h, --help                Show help message
+```
+
+### Room Import Options
+
+```bash
+-f, --file FILE           JSON export file to import (required)
+--room-id ROOM_ID         Target room ID (default: create new room)
+-y, --yes                 Skip confirmation prompt
 -h, --help                Show help message
 ```
 
@@ -449,6 +470,31 @@ RELEASE_NAME           Helm release name (default: matrix-synapse)
 ./scripts/matrix-admin.sh room-delete -r '!AbCdEfG:matrix.example.com' --purge -y
 ```
 
+**Export room (state only):**
+```bash
+./scripts/matrix-admin.sh room-export -r '!AbCdEfG:matrix.example.com'
+```
+
+**Export room with messages:**
+```bash
+./scripts/matrix-admin.sh room-export -r '!AbCdEfG:matrix.example.com' --include-messages --limit 5000
+```
+
+**Export to specific file:**
+```bash
+./scripts/matrix-admin.sh room-export -r '!AbCdEfG:matrix.example.com' -o my_room_backup.json
+```
+
+**Import room (creates new room):**
+```bash
+./scripts/matrix-admin.sh room-import -f .backup/rooms/room_export.json
+```
+
+**Import to existing room:**
+```bash
+./scripts/matrix-admin.sh room-import -f export.json --room-id '!AbCdEfG:matrix.example.com' -y
+```
+
 **Use custom namespace:**
 ```bash
 NAMESPACE=my-matrix ./scripts/matrix-admin.sh list
@@ -532,6 +578,27 @@ NAMESPACE=my-matrix ./scripts/matrix-admin.sh room-list
 4. **Blocks** room to prevent re-creation
 5. **Optionally** purges room history from database (--purge flag)
 6. **Kicks** all members from room
+
+**Room Export Command:**
+1. **Authenticates** using admin credentials from Kubernetes secret
+2. **URL-encodes** room ID for API compatibility
+3. **Fetches** room state via Admin API (`/_synapse/admin/v1/rooms/<room_id>/state`)
+4. **Fetches** room details via Admin API (`/_synapse/admin/v1/rooms/<room_id>`)
+5. **Fetches** room members via Admin API (`/_synapse/admin/v2/rooms/<room_id>/members`)
+6. **Optionally** fetches message history via Client API (--include-messages flag)
+7. **Creates** JSON export file with all data using Python for proper formatting
+8. **Saves** to `.backup/rooms/` by default or custom path
+9. **Displays** export summary with file size and timestamp
+
+**Room Import Command:**
+1. **Validates** export file exists and is readable
+2. **Parses** JSON export to extract room metadata
+3. **Shows** confirmation prompt with room details (unless `-y` flag)
+4. **Authenticates** using admin credentials from Kubernetes secret
+5. **Creates** new room or uses specified target room (--room-id flag)
+6. **Imports** room state events (name, topic, avatar, join rules)
+7. **Reports** what was imported and message count available
+8. **Note:** Full message import requires manual database manipulation for timestamp preservation
 
 ### Output
 
