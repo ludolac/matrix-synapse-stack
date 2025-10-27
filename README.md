@@ -104,7 +104,7 @@ This production-ready Helm chart simplifies the deployment of Matrix Synapse on 
 - [Installation](#installation)
 - [Configuration](#configuration)
   - [Core Configuration](#core-configuration)
-  - [SSO/OIDC Integration](#ssooeidc-integration)
+  - [SSO/OIDC Integration](#ssooidc-integration)
   - [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
   - [URL Previews](#url-previews)
   - [Element Web Theming](#element-web-theming)
