@@ -154,24 +154,180 @@ This production-ready Helm chart simplifies the deployment of Matrix Synapse on 
 
 ## Requirements
 
-### Infrastructure
+### Core Dependencies
 
-- **Kubernetes Cluster**: v1.24+
-- **Helm**: v3.8+
-- **kubectl**: Configured for your cluster
-- **Ingress Controller**: Traefik (with cert-manager for TLS)
-- **Storage Class**: Dynamic provisioning (Longhorn, NFS, etc.)
+| Component | Version | Required | Purpose |
+|-----------|---------|----------|---------|
+| **Kubernetes** | v1.24+ | ✅ Yes | Container orchestration platform |
+| **Helm** | v3.8+ | ✅ Yes | Package manager for Kubernetes |
+| **kubectl** | v1.24+ | ✅ Yes | Kubernetes command-line tool |
+
+### Infrastructure Components
+
+| Component | Version | Required | Purpose | Notes |
+|-----------|---------|----------|---------|-------|
+| **Ingress Controller** | Latest | ✅ Yes | HTTP/HTTPS routing | Traefik recommended, Nginx compatible |
+| **cert-manager** | v1.11+ | ⚠️ Recommended | TLS certificate management | Required for automatic HTTPS |
+| **Storage Provisioner** | - | ✅ Yes | Persistent volume provisioning | Longhorn, OpenEBS, NFS, or cloud provider |
+| **external-dns** | v0.13+ | ⚙️ Optional | Automatic DNS management | Automates DNS record creation |
+| **Prometheus** | v2.40+ | ⚙️ Optional | Metrics collection | For monitoring and alerting |
+| **PostgreSQL** | 15+ | ℹ️ Built-in | Database backend | Included in chart (external DB supported) |
+
+### Traefik Ingress Configuration
+
+This chart is optimized for **Traefik** ingress controller with the following features:
+
+- **HTTP/HTTPS Routes**: Standard web traffic on ports 80/443
+- **Federation Port**: Matrix federation on port 8448 (custom entrypoint required)
+- **TLS Termination**: Automatic via cert-manager integration
+- **Annotations**: Pre-configured for Traefik routing
+
+**Traefik Setup Requirements:**
+
+```yaml
+# Traefik values.yaml - Add federation entrypoint
+ports:
+  websecure:
+    port: 443
+    exposedPort: 443
+  matrix-federation:
+    port: 8448
+    exposedPort: 8448
+    protocol: TCP
+```
+
+**Alternative Ingress Controllers:**
+
+- **Nginx Ingress**: Supported, requires annotation adjustments
+- **Kong**: Compatible with configuration changes
+- **HAProxy**: Supported with custom annotations
+
+### cert-manager Configuration
+
+**Installation:**
+
+```bash
+# Add Jetstack repository
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+
+# Install cert-manager
+helm install cert-manager jetstack/cert-manager \
+  --namespace cert-manager \
+  --create-namespace \
+  --version v1.14.0 \
+  --set installCRDs=true
+```
+
+**ClusterIssuer Setup (Let's Encrypt):**
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: your-email@example.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: traefik
+```
+
+### external-dns (Optional)
+
+Automatically manages DNS records for your Matrix homeserver.
+
+**Supported Providers:**
+- Cloudflare
+- AWS Route53
+- Google Cloud DNS
+- Azure DNS
+- OVH
+- And [many more](https://github.com/kubernetes-sigs/external-dns)
+
+**Example Configuration (Cloudflare):**
+
+```yaml
+# external-dns values
+provider: cloudflare
+cloudflare:
+  apiToken: "your-api-token"
+  proxied: false
+domainFilters:
+  - yourdomain.com
+txtOwnerId: "matrix-synapse"
+```
+
+### Storage Classes
+
+The chart requires a **StorageClass** for persistent volumes:
+
+| Storage Type | Use Case | Performance | Recommended |
+|--------------|----------|-------------|-------------|
+| **Longhorn** | Self-hosted, replicated | Good | ✅ Production |
+| **OpenEBS** | Self-hosted, flexible | Good | ✅ Production |
+| **NFS** | Simple, shared storage | Medium | ⚠️ Development |
+| **Local Path** | Node-local storage | Fast | ⚠️ Single-node only |
+| **Cloud Provider** | AWS EBS, GCE PD, Azure Disk | Excellent | ✅ Production |
+
+**Check Available Storage Classes:**
+
+```bash
+kubectl get storageclass
+```
+
+### Network Requirements
+
+**Ports:**
+
+| Port | Protocol | Purpose | Exposure |
+|------|----------|---------|----------|
+| 443 | HTTPS | Client API, Element Web | Public |
+| 8448 | HTTPS | Matrix Federation | Public |
+| 3478 | UDP/TCP | TURN/STUN (Coturn) | Public |
+| 5349 | TCP | TURN over TLS | Public |
+| 49152-65535 | UDP | TURN relay ports | Public |
+
+**DNS Records Required:**
+
+```
+matrix.yourdomain.com          → Ingress IP (A/AAAA)
+element.yourdomain.com         → Ingress IP (A/AAAA)
+turn.yourdomain.com            → Coturn IP (A/AAAA)
+
+# Optional: Auto-discovery
+_matrix._tcp.yourdomain.com    → SRV record (for federation)
+```
+
+### Kubernetes Version Compatibility
+
+| Kubernetes Version | Status | Notes |
+|--------------------|--------|-------|
+| v1.31+ | ✅ Tested | Latest release |
+| v1.30 | ✅ Tested | Stable |
+| v1.29 | ✅ Tested | Stable |
+| v1.28 | ✅ Tested | Stable |
+| v1.27 | ✅ Supported | Tested |
+| v1.26 | ✅ Supported | Tested |
+| v1.25 | ⚠️ Compatible | Untested |
+| v1.24 | ⚠️ Compatible | Untested |
+| < v1.24 | ❌ Not Supported | EOL versions |
 
 ### Resources
 
-**Minimum:**
-- CPU: 2 cores
-- Memory: 4GB RAM
-- Storage: 20GB
+**Minimum Requirements:**
+- **CPU**: 2 cores
+- **Memory**: 4GB RAM
+- **Storage**: 20GB
 
-**Recommended:**
-- CPU: 4 cores
-- Memory: 8GB RAM
+**Recommended for Production:**
+- **CPU**: 4 cores
+- **Memory**: 8GB RAM
 - Storage: 50GB+
 
 ### DNS Configuration
