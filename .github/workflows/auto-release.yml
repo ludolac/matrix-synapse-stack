@@ -134,6 +134,6 @@ jobs:
 
             See commit history for detailed changes.
           files: |
-            *.tgz
+            /tmp/helm-charts/*.tgz
           draft: false
           prerelease: false
