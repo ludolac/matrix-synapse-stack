@@ -237,16 +237,10 @@ synapse:
         mxid_source_attribute: "uid"  # SAML attribute for username
         mxid_mapping: "dotreplace"    # Optional: how to map username
 
-  # Database configuration
+  # Database connection pool (psycopg2). The database host / user / password
+  # are derived automatically from the `postgresql` section (cnpg | standalone
+  # | external mode). Override here only if you need tuning.
   database:
-    external: false
-    host: postgresql.default.svc.cluster.local
-    port: 5432
-    name: synapse
-    user: synapse
-    # Password is provided via POSTGRES_PASSWORD environment variable
-    # from the matrix-synapse-postgresql secret (same secret used by PostgreSQL)
-    # Connection pool
     cpMin: 5
     cpMax: 10
 
@@ -460,93 +454,188 @@ networkPolicy:
       podSelector: {}
 
 # PostgreSQL configuration
+#
+# Deployment mode:
+#   cnpg       -> CloudNativePG operator (HA, recommended for production)
+#                 Prerequisite: CNPG operator installed cluster-wide.
+#                 Docs: https://cloudnative-pg.io/documentation/
+#   standalone -> Single-instance PostgreSQL managed by this chart (no HA).
+#                 Use for dev/test or simple homelab setups.
+#   external   -> Bring your own PostgreSQL; configure postgresql.external.
 postgresql:
-  enabled: true
+  mode: cnpg
 
-  image:
-    repository: postgres
-    tag: "16-alpine"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
+  # Common database/user (applies to all modes)
   database: synapse
   username: synapse
-  # Password should be provided via secret
-  postgresPassword: ""
 
-  # Password fix job (post-install/post-upgrade hook)
-  # This job updates PostgreSQL password with the value from Kubernetes secret
-  # Generally NOT needed for fresh installs as PostgreSQL initializes with correct password
-  # Only useful for migrating from external databases or password rotation scenarios
-  passwordFixJob:
-    enabled: false  # Disabled by default (not needed for most deployments)
+  # ---------------------------------------------------------------------------
+  # CloudNativePG (HA, recommended)
+  # ---------------------------------------------------------------------------
+  cnpg:
+    # Number of PostgreSQL instances (1 primary + N-1 replicas).
+    # 3 = production HA (1 primary, 2 hot standbys). 1 = no HA.
+    instances: 3
 
-  # Synapse-specific PostgreSQL settings
-  initdbArgs: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
+    # Synchronous replication (0 = asynchronous, safest for write latency).
+    # Increase for zero-data-loss guarantees at the cost of write latency.
+    minSyncReplicas: 0
+    maxSyncReplicas: 0
 
-  # Container security context
-  containerSecurityContext:
-    allowPrivilegeEscalation: false
-    capabilities:
-      drop:
-        - ALL
-    readOnlyRootFilesystem: false
-    runAsNonRoot: true
-    runAsUser: 999
+    # CNPG-compatible PostgreSQL image (must include the CNPG extensions)
+    imageName: ghcr.io/cloudnative-pg/postgresql:16.4
 
-  # Persistence
-  persistence:
-    storageClassName: "standard"
-    size: 20Gi
+    # Storage configuration (one PVC per instance)
+    storage:
+      size: 20Gi
+      storageClass: "standard"
 
-  # Resources
-  resources:
-    limits:
-      cpu: 1000m
-      memory: 1Gi
-    requests:
-      cpu: 500m
-      memory: 512Mi
+    # Resources per instance
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
 
-  # PostgreSQL configuration
-  config:
-    maxConnections: 200
-    sharedBuffers: "256MB"
-    effectiveCacheSize: "1GB"
-    maintenanceWorkMem: "64MB"
-    workMem: "8MB"
-    # Synapse requires these settings
-    walLevel: "minimal"
-    maxWalSenders: 0
+    # PostgreSQL runtime parameters.
+    # CNPG manages wal_level / max_wal_senders / max_replication_slots
+    # automatically - do not override them here.
+    parameters:
+      max_connections: "200"
+      shared_buffers: "256MB"
+      effective_cache_size: "1GB"
+      maintenance_work_mem: "64MB"
+      work_mem: "8MB"
+      random_page_cost: "1.1"
+      effective_io_concurrency: "200"
 
-    # Logging configuration
-    # Log queries slower than this (milliseconds). -1 = disabled, 0 = all queries
-    logMinDurationStatement: 1000  # Log queries taking > 1 second
+    # Bootstrap: initial cluster creation.
+    # Locale C / encoding UTF8 is REQUIRED by Synapse.
+    bootstrap:
+      encoding: UTF8
+      localeCollate: C
+      localeCType: C
 
-    # Connection logging
-    logConnections: true           # Log new connections
-    logDisconnections: true        # Log disconnections
+    # Prometheus PodMonitor (scraped by prometheus-operator / VictoriaMetrics)
+    monitoring:
+      enablePodMonitor: true
 
-    # Statement logging level
-    # Options: debug5, debug4, debug3, debug2, debug1, info, notice, warning, error, log, fatal, panic
-    logStatementLevel: "notice"    # Minimum level to log (notice = default, quiet)
+    # Spread instances across nodes for HA.
+    # Use "required" for hard guarantee (needs enough nodes), "preferred" otherwise.
+    affinity:
+      enablePodAntiAffinity: true
+      topologyKey: kubernetes.io/hostname
+      podAntiAffinityType: preferred
 
-    # What types of statements to log
-    # Options: none, ddl (schema changes), mod (data modifications), all
-    logStatement: "none"           # Log statement types (none = quiet, recommended for production)
+    # Scheduling
+    nodeSelector: {}
+    tolerations: []
+    priorityClassName: ""
 
-    # Error detail level
-    # Options: terse, default, verbose
-    logErrorVerbosity: "default"   # Error message detail level
+    # Backups to an S3-compatible object store (Barman Cloud).
+    # Requires a pre-existing secret with ACCESS_KEY_ID and ACCESS_SECRET_KEY.
+    backup:
+      enabled: false
+      # Retention policy (e.g. "30d", "7d"). Older base backups are pruned.
+      retentionPolicy: "30d"
+      # Destination: s3://<bucket>/<path>
+      destinationPath: ""
+      # S3 endpoint (e.g. OVH: https://s3.gra.cloud.ovh.net)
+      endpointURL: ""
+      # Secret name holding S3 credentials (ACCESS_KEY_ID / ACCESS_SECRET_KEY)
+      s3Credentials:
+        secretName: ""
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+        immediateCheckpoint: false
+        jobs: 2
+      # Optional schedule for automated base backups (cron syntax, UTC).
+      # Leave empty to disable scheduled backups (manual only).
+      scheduledBackup:
+        enabled: false
+        schedule: "0 0 3 * * *"  # daily at 03:00 UTC
+        immediate: true
 
-    # Log line prefix format
-    logLinePrefix: "%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h "
+  # ---------------------------------------------------------------------------
+  # Standalone (single-instance, no HA)
+  # ---------------------------------------------------------------------------
+  standalone:
+    image:
+      repository: postgres
+      tag: "16-alpine"
+      pullPolicy: IfNotPresent
 
-    # Additional logging options
-    logLockWaits: false            # Log when session waits longer than deadlock_timeout
-    logTempFiles: -1               # Log temp files larger than this (KB). -1 = disabled
-    logAutovacuumMinDuration: -1   # Log autovacuum activity slower than this (ms). -1 = disabled
+    replicaCount: 1
+
+    # Password should be provided via a Kubernetes secret created out-of-band.
+    # If set here, a secret named <release>-postgresql is created with this value.
+    postgresPassword: ""
+
+    # Synapse requires C locale + UTF8 encoding
+    initdbArgs: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
+
+    # Post-install/upgrade job to align the DB password with the secret.
+    # Only needed for password rotation or migration scenarios.
+    passwordFixJob:
+      enabled: false
+
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      readOnlyRootFilesystem: false
+      runAsNonRoot: true
+      runAsUser: 999
+
+    persistence:
+      storageClassName: "standard"
+      size: 20Gi
+
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+
+    config:
+      maxConnections: 200
+      sharedBuffers: "256MB"
+      effectiveCacheSize: "1GB"
+      maintenanceWorkMem: "64MB"
+      workMem: "8MB"
+      # Single-instance: no replication needed
+      walLevel: "minimal"
+      maxWalSenders: 0
+
+      # Logging
+      logMinDurationStatement: 1000
+      logConnections: true
+      logDisconnections: true
+      logStatementLevel: "notice"
+      logStatement: "none"
+      logErrorVerbosity: "default"
+      logLinePrefix: "%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h "
+      logLockWaits: false
+      logTempFiles: -1
+      logAutovacuumMinDuration: -1
+
+  # ---------------------------------------------------------------------------
+  # External (BYO PostgreSQL)
+  # ---------------------------------------------------------------------------
+  external:
+    host: ""
+    port: 5432
+    # Existing secret containing the DB password under passwordKey
+    existingSecret:
+      name: ""
+      passwordKey: "password"
 
 # Coturn TURN Server Configuration
 # Integrated TURN server for WebRTC video/voice calls

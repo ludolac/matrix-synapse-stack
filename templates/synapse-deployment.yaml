@@ -62,8 +62,8 @@ spec:
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "matrix-synapse.fullname" . }}-postgresql
-                  key: postgres-password
+                  name: {{ include "matrix-synapse.postgresql.secretName" . }}
+                  key: {{ include "matrix-synapse.postgresql.secretPasswordKey" . }}
             {{- if .Values.synapse.server.adminUser.enabled }}
             - name: REGISTRATION_SHARED_SECRET
               valueFrom:
@@ -127,9 +127,9 @@ spec:
             - name: SYNAPSE_REPORT_STATS
               value: {{ .Values.synapse.server.reportStats | ternary "yes" "no" | quote }}
             - name: POSTGRES_HOST
-              value: {{ include "matrix-synapse.fullname" . }}-postgresql
+              value: {{ include "matrix-synapse.postgresql.host" . | quote }}
             - name: POSTGRES_PORT
-              value: "5432"
+              value: {{ include "matrix-synapse.postgresql.port" . | quote }}
             - name: POSTGRES_DB
               value: {{ .Values.postgresql.database | quote }}
             - name: POSTGRES_USER
@@ -137,8 +137,8 @@ spec:
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "matrix-synapse.fullname" . }}-postgresql
-                  key: postgres-password
+                  name: {{ include "matrix-synapse.postgresql.secretName" . }}
+                  key: {{ include "matrix-synapse.postgresql.secretPasswordKey" . }}
             {{- if .Values.synapse.server.adminUser.enabled }}
             - name: REGISTRATION_SHARED_SECRET
               valueFrom:

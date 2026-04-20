@@ -1,4 +1,4 @@
-{{- if .Values.postgresql.enabled }}
+{{- if eq (.Values.postgresql.mode | default "cnpg") "standalone" }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -7,7 +7,7 @@ metadata:
     {{- include "matrix-synapse.postgresql.labels" . | nindent 4 }}
 spec:
   serviceName: {{ include "matrix-synapse.fullname" . }}-postgresql
-  replicas: {{ .Values.postgresql.replicaCount }}
+  replicas: {{ .Values.postgresql.standalone.replicaCount }}
   selector:
     matchLabels:
       {{- include "matrix-synapse.postgresql.selectorLabels" . | nindent 6 }}
@@ -25,12 +25,12 @@ spec:
       serviceAccountName: {{ include "matrix-synapse.fullname" . }}-postgresql
       containers:
         - name: postgresql
-          {{- if .Values.postgresql.containerSecurityContext }}
+          {{- if .Values.postgresql.standalone.containerSecurityContext }}
           securityContext:
-            {{- toYaml .Values.postgresql.containerSecurityContext | nindent 12 }}
+            {{- toYaml .Values.postgresql.standalone.containerSecurityContext | nindent 12 }}
           {{- end }}
-          image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
-          imagePullPolicy: {{ .Values.postgresql.image.pullPolicy }}
+          image: "{{ .Values.postgresql.standalone.image.repository }}:{{ .Values.postgresql.standalone.image.tag }}"
+          imagePullPolicy: {{ .Values.postgresql.standalone.image.pullPolicy }}
           ports:
             - name: postgresql
               containerPort: 5432
@@ -43,12 +43,12 @@ spec:
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "matrix-synapse.fullname" . }}-postgresql
-                  key: postgres-password
+                  name: {{ include "matrix-synapse.postgresql.secretName" . }}
+                  key: {{ include "matrix-synapse.postgresql.secretPasswordKey" . }}
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
             - name: POSTGRES_INITDB_ARGS
-              value: {{ .Values.postgresql.initdbArgs | quote }}
+              value: {{ .Values.postgresql.standalone.initdbArgs | quote }}
           livenessProbe:
             exec:
               command:
@@ -70,7 +70,7 @@ spec:
             timeoutSeconds: 1
             failureThreshold: 3
           resources:
-            {{- toYaml .Values.postgresql.resources | nindent 12 }}
+            {{- toYaml .Values.postgresql.standalone.resources | nindent 12 }}
           volumeMounts:
             - name: postgresql-data
               mountPath: /var/lib/postgresql/data
@@ -99,8 +99,8 @@ spec:
       spec:
         accessModes:
           - ReadWriteOnce
-        storageClassName: {{ .Values.postgresql.persistence.storageClassName }}
+        storageClassName: {{ .Values.postgresql.standalone.persistence.storageClassName }}
         resources:
           requests:
-            storage: {{ .Values.postgresql.persistence.size }}
+            storage: {{ .Values.postgresql.standalone.persistence.size }}
 {{- end }}

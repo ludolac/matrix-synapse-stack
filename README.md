@@ -169,9 +169,25 @@ This production-ready Helm chart simplifies the deployment of Matrix Synapse on 
 | **Ingress Controller** | Latest | ✅ Yes | HTTP/HTTPS routing | Traefik recommended, Nginx compatible |
 | **cert-manager** | v1.11+ | ⚠️ Recommended | TLS certificate management | Required for automatic HTTPS |
 | **Storage Provisioner** | - | ✅ Yes | Persistent volume provisioning | Longhorn, OpenEBS, NFS, or cloud provider |
+| **CloudNativePG operator** | v1.22+ | ✅ Yes (default) | HA PostgreSQL via `postgresql.mode=cnpg` | Not required for `standalone` or `external` mode |
 | **external-dns** | v0.13+ | ⚙️ Optional | Automatic DNS management | Automates DNS record creation |
 | **Prometheus** | v2.40+ | ⚙️ Optional | Metrics collection | For monitoring and alerting |
 | **PostgreSQL** | 16-alpine | [![Critical](https://img.shields.io/badge/critical-1-critical)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24670220460) | [![High](https://img.shields.io/badge/high-7-important)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24670220460) | [![Medium](https://img.shields.io/badge/medium-15-orange)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24670220460) | [![Low](https://img.shields.io/badge/low-1-informational)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24670220460) |
+
+#### CloudNativePG operator
+
+The chart defaults to `postgresql.mode=cnpg` for a highly available PostgreSQL
+cluster. Install the operator once per cluster **before** deploying this chart:
+
+```bash
+kubectl apply --server-side -f \
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.24/releases/cnpg-1.24.0.yaml
+```
+
+Docs: https://cloudnative-pg.io/documentation/current/installation_upgrade/
+
+If you don't want to run the operator (dev, homelab, CI), switch to
+`postgresql.mode=standalone` — see [Database](#database) below.
 
 ### Traefik Ingress Configuration
 
@@ -482,14 +498,160 @@ synapse:
 
 #### Database
 
+The chart supports three PostgreSQL deployment modes, selected via `postgresql.mode`.
+All three expose the same interface to Synapse — only the backing implementation differs.
+
+| Mode | HA | Failover | Backups | When to use |
+|------|----|----|----|----|
+| `cnpg` *(default)* | ✅ | Automatic (CNPG operator) | Native (Barman / S3) | Production, any HA workload |
+| `standalone` | ❌ | Manual restore from PVC | Manual `pg_dump` | Dev, CI, homelab without CNPG |
+| `external` | Depends | — | Managed externally | BYO DB (RDS, OVH Managed DB, on-prem) |
+
+Regardless of the mode, the `database`/`username` fields are shared:
+
 ```yaml
 postgresql:
-  enabled: true
-  database: "synapse_prod"
-  username: "synapse"
-  persistence:
-    size: "5Gi"
-    storageClass: "longhorn"
+  mode: cnpg           # cnpg | standalone | external
+  database: synapse_prod
+  username: synapse
+```
+
+##### Mode `cnpg` (recommended)
+
+Deploys a [CloudNativePG](https://cloudnative-pg.io/) `Cluster` managed by the
+CNPG operator. 3 instances by default (1 primary + 2 hot standbys) spread
+across nodes via pod anti-affinity. The operator handles failover, streaming
+replication, rolling upgrades, and credential rotation.
+
+```yaml
+postgresql:
+  mode: cnpg
+  database: synapse_prod
+  username: synapse
+  cnpg:
+    instances: 3              # 1 primary + 2 hot standbys
+    imageName: ghcr.io/cloudnative-pg/postgresql:16.4
+    storage:
+      size: 20Gi
+      storageClass: longhorn
+    resources:
+      limits:   { cpu: 2000m, memory: 2Gi }
+      requests: { cpu: 1000m, memory: 1Gi }
+    parameters:
+      max_connections: "500"
+      shared_buffers: "512MB"
+      effective_cache_size: "2GB"
+    bootstrap:
+      encoding: UTF8
+      localeCollate: C         # required by Synapse
+      localeCType: C           # required by Synapse
+    monitoring:
+      enablePodMonitor: true   # scraped by Prometheus / VictoriaMetrics
+    affinity:
+      enablePodAntiAffinity: true
+      topologyKey: kubernetes.io/hostname
+      podAntiAffinityType: preferred   # use "required" for strict spreading
+```
+
+Synapse connects to the primary via the auto-created service `<release>-cnpg-rw`
+and reads its password from the auto-generated secret `<release>-cnpg-app`
+(key `password`). No manual secret creation needed.
+
+**Backups to S3 (Barman Cloud):**
+
+```yaml
+postgresql:
+  cnpg:
+    backup:
+      enabled: true
+      retentionPolicy: "30d"
+      destinationPath: "s3://waadoo-matrix-backups/synapse-prod"
+      endpointURL: "https://s3.gra.cloud.ovh.net"
+      s3Credentials:
+        secretName: ovh-s3-backup-credentials  # must contain ACCESS_KEY_ID / ACCESS_SECRET_KEY
+      scheduledBackup:
+        enabled: true
+        schedule: "0 0 3 * * *"  # daily at 03:00 UTC
+        immediate: true
+```
+
+Create the S3 credentials secret:
+
+```bash
+kubectl create secret generic ovh-s3-backup-credentials -n matrix \
+  --from-literal=ACCESS_KEY_ID=... \
+  --from-literal=ACCESS_SECRET_KEY=...
+```
+
+**Useful CNPG commands:**
+
+```bash
+# Cluster status (primary/replicas, WAL lag, etc.)
+kubectl cnpg status <release>-cnpg -n matrix
+
+# Trigger a manual backup
+kubectl cnpg backup <release>-cnpg -n matrix
+
+# Promote a replica (failover test)
+kubectl cnpg promote <release>-cnpg <pod-name> -n matrix
+```
+
+##### Mode `standalone`
+
+Single-instance PostgreSQL managed directly by this chart (StatefulSet). No HA,
+no streaming replication. Good for dev, CI, or small homelab setups that don't
+run the CNPG operator.
+
+```yaml
+postgresql:
+  mode: standalone
+  database: synapse_prod
+  username: synapse
+  standalone:
+    image:
+      repository: postgres
+      tag: "16-alpine"
+    # Either set the password here OR create the secret <release>-postgresql
+    # with key postgres-password out-of-band (e.g. via scripts/generate-secrets.sh).
+    postgresPassword: ""
+    persistence:
+      storageClassName: longhorn
+      size: 20Gi
+    resources:
+      limits:   { cpu: 1000m, memory: 1Gi }
+      requests: { cpu: 500m, memory: 512Mi }
+    config:
+      maxConnections: 200
+      sharedBuffers: "256MB"
+      walLevel: "minimal"    # no replication
+      maxWalSenders: 0
+```
+
+##### Mode `external`
+
+Bring your own PostgreSQL (managed service, existing cluster, etc.). The chart
+does not deploy any database resources. You provide the host and a secret
+containing the password.
+
+```yaml
+postgresql:
+  mode: external
+  database: synapse_prod
+  username: synapse
+  external:
+    host: pg.internal.example.com
+    port: 5432
+    existingSecret:
+      name: matrix-external-db        # must already exist in the release namespace
+      passwordKey: password           # key inside the secret holding the password
+```
+
+The database **must** be created with `ENCODING=UTF8 LC_COLLATE=C LC_CTYPE=C`
+(Synapse requirement). Example:
+
+```sql
+CREATE DATABASE synapse_prod
+  WITH ENCODING='UTF8' LC_COLLATE='C' LC_CTYPE='C' TEMPLATE=template0;
 ```
 
 #### Email Configuration
@@ -1063,7 +1225,18 @@ See `scripts/README.md` for full documentation.
 
 ### Backup Commands
 
-**Database:**
+**Database (mode `cnpg`):** use the operator's built-in Barman backups
+(configured via `postgresql.cnpg.backup` — see [Database](#database)). To trigger
+an on-demand backup:
+
+```bash
+kubectl cnpg backup matrix-synapse-cnpg -n matrix
+# or via logical dump on the primary:
+kubectl exec matrix-synapse-cnpg-1 -n matrix -c postgres -- \
+  pg_dump -U synapse synapse_prod | gzip > matrix-db-$(date +%Y%m%d).sql.gz
+```
+
+**Database (mode `standalone`):**
 ```bash
 kubectl exec matrix-synapse-postgresql-0 -n matrix -- \
   pg_dump -U synapse synapse_prod | gzip > matrix-db-$(date +%Y%m%d).sql.gz
@@ -1089,7 +1262,20 @@ kubectl get secrets -n matrix -o yaml > matrix-secrets-$(date +%Y%m%d).yaml
 
 ### Restore Procedures
 
-**Database:**
+**Database (mode `cnpg`):** for point-in-time recovery from Barman backups, use
+the CNPG [bootstrap.recovery](https://cloudnative-pg.io/documentation/current/recovery/)
+mechanism on a new Cluster pointing to the same `barmanObjectStore`. For logical
+restore from a `pg_dump`:
+
+```bash
+PRIMARY=$(kubectl get pod -n matrix -l cnpg.io/cluster=matrix-synapse-cnpg,role=primary -o name)
+kubectl cp ./matrix-db-backup.sql.gz matrix/${PRIMARY#pod/}:/tmp/ -c postgres
+kubectl exec -it $PRIMARY -n matrix -c postgres -- \
+  bash -c "gunzip /tmp/matrix-db-backup.sql.gz && \
+           psql -U synapse synapse_prod < /tmp/matrix-db-backup.sql"
+```
+
+**Database (mode `standalone`):**
 ```bash
 kubectl cp ./matrix-db-backup.sql.gz matrix/matrix-synapse-postgresql-0:/tmp/
 kubectl exec -it matrix-synapse-postgresql-0 -n matrix -- \
@@ -1149,12 +1335,27 @@ kubectl exec deployment/matrix-synapse-synapse -n matrix -- \
 
 #### Database Connection Errors
 
+**Mode `cnpg`:**
+
 ```bash
-# Check PostgreSQL
+# Cluster health + which pod is primary
+kubectl cnpg status matrix-synapse-cnpg -n matrix
+
+# Pod / operator events
+kubectl get pods -n matrix -l cnpg.io/cluster=matrix-synapse-cnpg
+kubectl logs -n matrix -l cnpg.io/cluster=matrix-synapse-cnpg -c postgres --tail=100
+
+# Test connectivity from Synapse (primary = -rw service)
+kubectl exec deployment/matrix-synapse-synapse -n matrix -- \
+  pg_isready -h matrix-synapse-cnpg-rw -p 5432
+```
+
+**Mode `standalone`:**
+
+```bash
 kubectl get pod matrix-synapse-postgresql-0 -n matrix
 kubectl logs matrix-synapse-postgresql-0 -n matrix
 
-# Test connection
 kubectl exec deployment/matrix-synapse-synapse -n matrix -- \
   pg_isready -h matrix-synapse-postgresql -p 5432
 ```
@@ -1326,10 +1527,11 @@ This Helm chart is licensed under the **MIT License** - see [LICENSE](LICENSE) f
 
 ## Chart Information
 
-- **Chart Version**: 1.5.0
+- **Chart Version**: 1.6.0
 - **Synapse Version**: v1.140.0
 - **Element Web Version**: v1.12.2
-- **PostgreSQL Version**: 16-alpine
+- **PostgreSQL Version**: 16 (ghcr.io/cloudnative-pg/postgresql:16.4 in CNPG mode, postgres:16-alpine in standalone mode)
+- **CloudNativePG**: v1.22+ (required when `postgresql.mode=cnpg`, the default)
 - **Coturn Version**: 4.6-alpine
 
 **Maintainer**: WAADOO - contact@waadoo.ovh

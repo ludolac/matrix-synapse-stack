@@ -2,7 +2,7 @@ apiVersion: v2
 name: matrix-synapse
 description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn TURN server on Kubernetes
 type: application
-version: 1.5.19
+version: 1.6.0
 appVersion: "1.140.0"
 keywords:
   - matrix
@@ -14,12 +14,21 @@ keywords:
   - chat
   - messaging
   - video-calls
+  - cnpg
+  - cloudnative-pg
 home: https://matrix.org
 icon: https://matrix.org/images/matrix-logo.svg
 sources:
   - https://github.com/element-hq/synapse
   - https://github.com/element-hq/element-web
   - https://github.com/coturn/coturn
+  - https://github.com/cloudnative-pg/cloudnative-pg
 maintainers:
   - name: WAADOO
     email: contact@waadoo.ovh
+annotations:
+  # When postgresql.mode=cnpg (default), the CloudNativePG operator must be
+  # installed cluster-wide BEFORE deploying this chart.
+  # https://cloudnative-pg.io/documentation/current/installation_upgrade/
+  artifacthub.io/prerequisites: |
+    - CloudNativePG operator (required when postgresql.mode=cnpg, the default)

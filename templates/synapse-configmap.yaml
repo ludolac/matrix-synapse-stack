@@ -32,14 +32,15 @@ data:
       {{- end }}
 
     # Database configuration
+    # Host/port/secret are resolved from postgresql.mode (cnpg | standalone | external)
     database:
       name: psycopg2
       args:
         user: "{{ .Values.postgresql.username }}"
         password: "{{ `${POSTGRES_PASSWORD}` }}"
         database: "{{ .Values.postgresql.database }}"
-        host: "{{ include "matrix-synapse.fullname" . }}-postgresql"
-        port: 5432
+        host: "{{ include "matrix-synapse.postgresql.host" . }}"
+        port: {{ include "matrix-synapse.postgresql.port" . }}
         cp_min: {{ .Values.synapse.database.cpMin }}
         cp_max: {{ .Values.synapse.database.cpMax }}
 

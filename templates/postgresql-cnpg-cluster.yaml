@@ -1,0 +1,119 @@
+{{- if eq (.Values.postgresql.mode | default "cnpg") "cnpg" }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "matrix-synapse.postgresql.cnpgClusterName" . }}
+  labels:
+    {{- include "matrix-synapse.postgresql.labels" . | nindent 4 }}
+spec:
+  instances: {{ .Values.postgresql.cnpg.instances }}
+  imageName: {{ .Values.postgresql.cnpg.imageName | quote }}
+
+  {{- with .Values.postgresql.cnpg.minSyncReplicas }}
+  minSyncReplicas: {{ . }}
+  {{- end }}
+  {{- with .Values.postgresql.cnpg.maxSyncReplicas }}
+  maxSyncReplicas: {{ . }}
+  {{- end }}
+
+  {{- with .Values.postgresql.cnpg.priorityClassName }}
+  priorityClassName: {{ . | quote }}
+  {{- end }}
+
+  bootstrap:
+    initdb:
+      database: {{ .Values.postgresql.database | quote }}
+      owner: {{ .Values.postgresql.username | quote }}
+      encoding: {{ .Values.postgresql.cnpg.bootstrap.encoding | quote }}
+      localeCollate: {{ .Values.postgresql.cnpg.bootstrap.localeCollate | quote }}
+      localeCType: {{ .Values.postgresql.cnpg.bootstrap.localeCType | quote }}
+
+  storage:
+    size: {{ .Values.postgresql.cnpg.storage.size | quote }}
+    {{- with .Values.postgresql.cnpg.storage.storageClass }}
+    storageClass: {{ . | quote }}
+    {{- end }}
+
+  {{- with .Values.postgresql.cnpg.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  postgresql:
+    {{- with .Values.postgresql.cnpg.parameters }}
+    parameters:
+      {{- range $key, $value := . }}
+      {{ $key }}: {{ $value | quote }}
+      {{- end }}
+    {{- end }}
+
+  {{- if .Values.postgresql.cnpg.monitoring.enablePodMonitor }}
+  monitoring:
+    enablePodMonitor: true
+  {{- end }}
+
+  {{- if .Values.postgresql.cnpg.affinity.enablePodAntiAffinity }}
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: {{ .Values.postgresql.cnpg.affinity.topologyKey | quote }}
+    podAntiAffinityType: {{ .Values.postgresql.cnpg.affinity.podAntiAffinityType | quote }}
+    {{- with .Values.postgresql.cnpg.nodeSelector }}
+    nodeSelector:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.postgresql.cnpg.tolerations }}
+    tolerations:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- else }}
+  {{- if or .Values.postgresql.cnpg.nodeSelector .Values.postgresql.cnpg.tolerations }}
+  affinity:
+    {{- with .Values.postgresql.cnpg.nodeSelector }}
+    nodeSelector:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.postgresql.cnpg.tolerations }}
+    tolerations:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- end }}
+  {{- end }}
+
+  {{- if .Values.postgresql.cnpg.backup.enabled }}
+  backup:
+    retentionPolicy: {{ .Values.postgresql.cnpg.backup.retentionPolicy | quote }}
+    barmanObjectStore:
+      destinationPath: {{ required "postgresql.cnpg.backup.destinationPath is required when backups are enabled" .Values.postgresql.cnpg.backup.destinationPath | quote }}
+      {{- with .Values.postgresql.cnpg.backup.endpointURL }}
+      endpointURL: {{ . | quote }}
+      {{- end }}
+      s3Credentials:
+        accessKeyId:
+          name: {{ required "postgresql.cnpg.backup.s3Credentials.secretName is required when backups are enabled" .Values.postgresql.cnpg.backup.s3Credentials.secretName | quote }}
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: {{ .Values.postgresql.cnpg.backup.s3Credentials.secretName | quote }}
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: {{ .Values.postgresql.cnpg.backup.wal.compression | quote }}
+      data:
+        compression: {{ .Values.postgresql.cnpg.backup.data.compression | quote }}
+        immediateCheckpoint: {{ .Values.postgresql.cnpg.backup.data.immediateCheckpoint }}
+        jobs: {{ .Values.postgresql.cnpg.backup.data.jobs }}
+  {{- end }}
+{{- if and .Values.postgresql.cnpg.backup.enabled .Values.postgresql.cnpg.backup.scheduledBackup.enabled }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: {{ include "matrix-synapse.postgresql.cnpgClusterName" . }}-scheduled
+  labels:
+    {{- include "matrix-synapse.postgresql.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.postgresql.cnpg.backup.scheduledBackup.schedule | quote }}
+  immediate: {{ .Values.postgresql.cnpg.backup.scheduledBackup.immediate }}
+  backupOwnerReference: self
+  cluster:
+    name: {{ include "matrix-synapse.postgresql.cnpgClusterName" . }}
+{{- end }}
+{{- end }}

@@ -1,4 +1,5 @@
-{{- if .Values.postgresql.enabled }}
+{{- if eq (.Values.postgresql.mode | default "cnpg") "standalone" }}
+{{- $cfg := .Values.postgresql.standalone.config }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -11,18 +12,18 @@ data:
     # Optimized for Synapse workload
 
     # Connection Settings
-    max_connections = {{ .Values.postgresql.config.maxConnections }}
+    max_connections = {{ $cfg.maxConnections }}
     superuser_reserved_connections = 3
 
     # Memory Settings
-    shared_buffers = {{ .Values.postgresql.config.sharedBuffers }}
-    effective_cache_size = {{ .Values.postgresql.config.effectiveCacheSize }}
-    maintenance_work_mem = {{ .Values.postgresql.config.maintenanceWorkMem }}
-    work_mem = {{ .Values.postgresql.config.workMem }}
+    shared_buffers = {{ $cfg.sharedBuffers }}
+    effective_cache_size = {{ $cfg.effectiveCacheSize }}
+    maintenance_work_mem = {{ $cfg.maintenanceWorkMem }}
+    work_mem = {{ $cfg.workMem }}
 
     # WAL Settings (minimal for single-instance)
-    wal_level = {{ .Values.postgresql.config.walLevel }}
-    max_wal_senders = {{ .Values.postgresql.config.maxWalSenders }}
+    wal_level = {{ $cfg.walLevel }}
+    max_wal_senders = {{ $cfg.maxWalSenders }}
 
     # Query Tuning
     random_page_cost = 1.1
@@ -30,49 +31,49 @@ data:
 
     # Logging Configuration
     # Slow query logging
-    log_min_duration_statement = {{ .Values.postgresql.config.logMinDurationStatement }}
+    log_min_duration_statement = {{ $cfg.logMinDurationStatement }}
 
     # Connection logging
-    {{- if .Values.postgresql.config.logConnections }}
+    {{- if $cfg.logConnections }}
     log_connections = on
     {{- else }}
     log_connections = off
     {{- end }}
-    {{- if .Values.postgresql.config.logDisconnections }}
+    {{- if $cfg.logDisconnections }}
     log_disconnections = on
     {{- else }}
     log_disconnections = off
     {{- end }}
 
     # Statement logging
-    {{- if .Values.postgresql.config.logStatement }}
-    log_statement = '{{ .Values.postgresql.config.logStatement }}'
+    {{- if $cfg.logStatement }}
+    log_statement = '{{ $cfg.logStatement }}'
     {{- end }}
 
     # Log level and verbosity
-    {{- if .Values.postgresql.config.logStatementLevel }}
-    log_min_messages = {{ .Values.postgresql.config.logStatementLevel }}
+    {{- if $cfg.logStatementLevel }}
+    log_min_messages = {{ $cfg.logStatementLevel }}
     {{- end }}
-    {{- if .Values.postgresql.config.logErrorVerbosity }}
-    log_error_verbosity = {{ .Values.postgresql.config.logErrorVerbosity }}
+    {{- if $cfg.logErrorVerbosity }}
+    log_error_verbosity = {{ $cfg.logErrorVerbosity }}
     {{- end }}
 
     # Log line format
-    {{- if .Values.postgresql.config.logLinePrefix }}
-    log_line_prefix = '{{ .Values.postgresql.config.logLinePrefix }}'
+    {{- if $cfg.logLinePrefix }}
+    log_line_prefix = '{{ $cfg.logLinePrefix }}'
     {{- end }}
 
     # Additional logging options
-    {{- if .Values.postgresql.config.logLockWaits }}
+    {{- if $cfg.logLockWaits }}
     log_lock_waits = on
     {{- else }}
     log_lock_waits = off
     {{- end }}
-    {{- if .Values.postgresql.config.logTempFiles }}
-    log_temp_files = {{ .Values.postgresql.config.logTempFiles }}
+    {{- if $cfg.logTempFiles }}
+    log_temp_files = {{ $cfg.logTempFiles }}
     {{- end }}
-    {{- if .Values.postgresql.config.logAutovacuumMinDuration }}
-    log_autovacuum_min_duration = {{ .Values.postgresql.config.logAutovacuumMinDuration }}
+    {{- if $cfg.logAutovacuumMinDuration }}
+    log_autovacuum_min_duration = {{ $cfg.logAutovacuumMinDuration }}
     {{- end }}
 
     # Locale and Encoding

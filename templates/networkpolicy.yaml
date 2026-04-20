@@ -69,7 +69,17 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # Allow PostgreSQL
+    # Allow PostgreSQL (selector depends on postgresql.mode)
+    {{- $pgMode := .Values.postgresql.mode | default "cnpg" }}
+    {{- if eq $pgMode "cnpg" }}
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: {{ include "matrix-synapse.postgresql.cnpgClusterName" . }}
+      ports:
+        - protocol: TCP
+          port: 5432
+    {{- else if eq $pgMode "standalone" }}
     - to:
         - podSelector:
             matchLabels:
@@ -78,6 +88,8 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
+    {{- end }}
+    {{- /* For mode=external, egress to PostgreSQL is handled by the catch-all TCP rules below */}}
     # Allow HTTPS for federation and external services (including SSO)
     # No 'to' selector = allow to any destination (cluster and external)
     - ports:
@@ -154,8 +166,11 @@ spec:
       ports:
         - protocol: TCP
           port: 443
+{{- if eq (.Values.postgresql.mode | default "cnpg") "standalone" }}
 ---
-# NetworkPolicy for PostgreSQL
+# NetworkPolicy for standalone PostgreSQL
+# (CNPG mode: the operator manages its own pod networking - add a CiliumNetworkPolicy
+#  or a dedicated NetworkPolicy via values overrides if stricter isolation is needed.)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -202,6 +217,7 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+{{- end }}
 ---
 # NetworkPolicy for Well-known server
 apiVersion: networking.k8s.io/v1

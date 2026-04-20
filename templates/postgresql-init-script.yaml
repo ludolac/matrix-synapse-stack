@@ -1,4 +1,4 @@
-{{- if .Values.postgresql.enabled }}
+{{- if eq (.Values.postgresql.mode | default "cnpg") "standalone" }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

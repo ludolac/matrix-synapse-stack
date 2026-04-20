@@ -100,3 +100,71 @@ app.kubernetes.io/name: {{ include "matrix-synapse.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/component: postgresql
 {{- end }}
+
+{{/*
+Name of the CNPG Cluster resource (used when postgresql.mode == "cnpg").
+*/}}
+{{- define "matrix-synapse.postgresql.cnpgClusterName" -}}
+{{- printf "%s-cnpg" (include "matrix-synapse.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Database hostname (read/write endpoint) resolved according to postgresql.mode.
+- cnpg:       <cluster>-rw (primary, managed by CNPG)
+- standalone: <fullname>-postgresql
+- external:   user-supplied host
+*/}}
+{{- define "matrix-synapse.postgresql.host" -}}
+{{- $mode := .Values.postgresql.mode | default "cnpg" -}}
+{{- if eq $mode "cnpg" -}}
+{{ printf "%s-rw" (include "matrix-synapse.postgresql.cnpgClusterName" .) }}
+{{- else if eq $mode "standalone" -}}
+{{ printf "%s-postgresql" (include "matrix-synapse.fullname" .) }}
+{{- else if eq $mode "external" -}}
+{{ required "postgresql.external.host is required when postgresql.mode=external" .Values.postgresql.external.host }}
+{{- else -}}
+{{ fail (printf "postgresql.mode must be one of: cnpg, standalone, external (got %q)" $mode) }}
+{{- end -}}
+{{- end }}
+
+{{/*
+Database port, same for all modes by default (5432), override via external.port.
+*/}}
+{{- define "matrix-synapse.postgresql.port" -}}
+{{- if eq (.Values.postgresql.mode | default "cnpg") "external" -}}
+{{ .Values.postgresql.external.port | default 5432 }}
+{{- else -}}
+5432
+{{- end -}}
+{{- end }}
+
+{{/*
+Name of the secret containing the PostgreSQL password.
+- cnpg:       <cluster>-app (created by the CNPG operator, keys: username/password/...)
+- standalone: <fullname>-postgresql (key: postgres-password)
+- external:   user-supplied existingSecret.name
+*/}}
+{{- define "matrix-synapse.postgresql.secretName" -}}
+{{- $mode := .Values.postgresql.mode | default "cnpg" -}}
+{{- if eq $mode "cnpg" -}}
+{{ printf "%s-app" (include "matrix-synapse.postgresql.cnpgClusterName" .) }}
+{{- else if eq $mode "standalone" -}}
+{{ printf "%s-postgresql" (include "matrix-synapse.fullname" .) }}
+{{- else if eq $mode "external" -}}
+{{ required "postgresql.external.existingSecret.name is required when postgresql.mode=external" .Values.postgresql.external.existingSecret.name }}
+{{- end -}}
+{{- end }}
+
+{{/*
+Secret key holding the PostgreSQL password.
+*/}}
+{{- define "matrix-synapse.postgresql.secretPasswordKey" -}}
+{{- $mode := .Values.postgresql.mode | default "cnpg" -}}
+{{- if eq $mode "cnpg" -}}
+password
+{{- else if eq $mode "standalone" -}}
+postgres-password
+{{- else if eq $mode "external" -}}
+{{ .Values.postgresql.external.existingSecret.passwordKey | default "password" }}
+{{- end -}}
+{{- end }}
