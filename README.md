@@ -8,7 +8,7 @@
 
 [![Helm Chart](https://img.shields.io/badge/helm-chart-blue)](https://ludolac.github.io/matrix-synapse-stack/)
 [![Chart Version](https://img.shields.io/badge/dynamic/yaml?url=https://ludolac.github.io/matrix-synapse-stack/index.yaml&query=$.entries.matrix-synapse[0].version&label=chart&color=0F1689&logo=helm)](https://ludolac.github.io/matrix-synapse-stack/)
-[![Synapse Version](https://img.shields.io/badge/synapse-v1.140.0-green)](https://github.com/element-hq/synapse)
+[![Synapse Version](https://img.shields.io/badge/synapse-v1.151.0-green)](https://github.com/element-hq/synapse)
 [![Security Scan](https://github.com/ludolac/matrix-synapse-stack/actions/workflows/trivy-scan.yml/badge.svg)](https://github.com/ludolac/matrix-synapse-stack/actions/workflows/trivy-scan.yml)
 [![Security](https://img.shields.io/badge/security-trivy-blue?logo=security)](https://github.com/ludolac/matrix-synapse-stack/security/code-scanning)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -120,9 +120,9 @@ This production-ready Helm chart simplifies the deployment of Matrix Synapse on 
 
 ## Features
 
-✅ **Matrix Synapse** v1.140.0 - Full-featured Matrix homeserver
+✅ **Matrix Synapse** v1.151.0 - Full-featured Matrix homeserver
 
-✅ **Element Web** v1.12.2 - Modern web client with dark theme
+✅ **Element Web** v1.12.15 - Modern web client with dark theme
 
 ✅ **PostgreSQL 16** - Reliable database backend
 
@@ -530,7 +530,7 @@ postgresql:
   username: synapse
   cnpg:
     instances: 3              # 1 primary + 2 hot standbys
-    imageName: ghcr.io/cloudnative-pg/postgresql:16.4
+    imageName: ghcr.io/cloudnative-pg/postgresql:17.9
     storage:
       size: 20Gi
       storageClass: longhorn
@@ -610,7 +610,7 @@ postgresql:
   standalone:
     image:
       repository: postgres
-      tag: "16-alpine"
+      tag: "17-alpine"
     # Either set the password here OR create the secret <release>-postgresql
     # with key postgres-password out-of-band (e.g. via scripts/generate-secrets.sh).
     postgresPassword: ""
@@ -1527,11 +1527,11 @@ This Helm chart is licensed under the **MIT License** - see [LICENSE](LICENSE) f
 
 ## Chart Information
 
-- **Chart Version**: 1.6.0
-- **Synapse Version**: v1.140.0
-- **Element Web Version**: v1.12.2
-- **PostgreSQL Version**: 16 (ghcr.io/cloudnative-pg/postgresql:16.4 in CNPG mode, postgres:16-alpine in standalone mode)
-- **CloudNativePG**: v1.22+ (required when `postgresql.mode=cnpg`, the default)
-- **Coturn Version**: 4.6-alpine
+- **Chart Version**: 1.7.0
+- **Synapse Version**: v1.151.0
+- **Element Web Version**: v1.12.15
+- **PostgreSQL Version**: 17 (`ghcr.io/cloudnative-pg/postgresql:17.9` in CNPG mode, `postgres:17-alpine` in standalone mode)
+- **CloudNativePG**: v1.29+ (required when `postgresql.mode=cnpg`, the default)
+- **Coturn Version**: 4.10-alpine
 
 **Maintainer**: WAADOO - contact@waadoo.ovh

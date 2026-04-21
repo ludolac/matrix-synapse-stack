@@ -15,7 +15,7 @@ synapse:
   image:
     # Using GitHub Container Registry to avoid Docker Hub rate limits
     repository: ghcr.io/element-hq/synapse
-    tag: "v1.140.0"
+    tag: "v1.151.0"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -308,7 +308,7 @@ element:
 
   image:
     repository: ghcr.io/element-hq/element-web
-    tag: "v1.12.2"
+    tag: "v1.12.15"
     pullPolicy: IfNotPresent
 
   replicaCount: 2
@@ -483,7 +483,7 @@ postgresql:
     maxSyncReplicas: 0
 
     # CNPG-compatible PostgreSQL image (must include the CNPG extensions)
-    imageName: ghcr.io/cloudnative-pg/postgresql:16.4
+    imageName: ghcr.io/cloudnative-pg/postgresql:17.9
 
     # Storage configuration (one PVC per instance)
     storage:
@@ -566,7 +566,7 @@ postgresql:
   standalone:
     image:
       repository: postgres
-      tag: "16-alpine"
+      tag: "17-alpine"
       pullPolicy: IfNotPresent
 
     replicaCount: 1
@@ -650,9 +650,9 @@ coturn:
   # Coturn container image
   image:
     repository: coturn/coturn
-    tag: "4.7-alpine"
+    tag: "4.10-alpine"
     pullPolicy: IfNotPresent
-  
+
   imagePullSecrets: []
   
   # External IP address for TURN relay
