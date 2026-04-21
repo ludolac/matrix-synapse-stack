@@ -86,24 +86,24 @@ jobs:
     strategy:
       matrix:
         image:
+          # image_expr: yq expression returning the full Trivy image reference
+          # (repo:tag). We use this instead of separate repo/tag fields because
+          # PostgreSQL in CNPG mode (the default) is configured via a single
+          # imageName field, not a split repository/tag.
           - name: synapse
-            repo: ghcr.io/element-hq/synapse
-            tag_key: synapse.image.tag
+            image_expr: '.synapse.image.repository + ":" + .synapse.image.tag'
           - name: element-web
-            repo: ghcr.io/element-hq/element-web
-            tag_key: element.image.tag
+            image_expr: '.element.image.repository + ":" + .element.image.tag'
           - name: postgresql
-            repo: postgres
-            tag_key: postgresql.image.tag
+            image_expr: '.postgresql.cnpg.imageName'
           - name: coturn
-            repo: coturn/coturn
-            tag_key: coturn.image.tag
+            image_expr: '.coturn.image.repository + ":" + .coturn.image.tag'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Extract image tag from values.yaml
-        id: get-tag
+      - name: Extract image reference from values.yaml
+        id: get-ref
         run: |
           # Install yq if not available
           if ! command -v yq &> /dev/null; then
@@ -111,16 +111,16 @@ jobs:
             sudo chmod +x /usr/local/bin/yq
           fi
 
-          # Extract tag from values.yaml using the tag_key
-          TAG=$(yq eval '.${{ matrix.image.tag_key }}' values.yaml | tr -d '"')
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "Image ${{ matrix.image.name }} version: $TAG"
+          # Build full image reference (repo:tag) from values.yaml
+          IMAGE_REF=$(yq eval '${{ matrix.image.image_expr }}' values.yaml | tr -d '"')
+          echo "ref=$IMAGE_REF" >> $GITHUB_OUTPUT
+          echo "Image ${{ matrix.image.name }} reference: $IMAGE_REF"
 
       - name: Run Trivy vulnerability scanner on ${{ matrix.image.name }}
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           version: v0.70.0
-          image-ref: '${{ matrix.image.repo }}:${{ steps.get-tag.outputs.tag }}'
+          image-ref: '${{ steps.get-ref.outputs.ref }}'
           format: 'sarif'
           output: 'trivy-${{ matrix.image.name }}-results.sarif'
           severity: 'CRITICAL,HIGH'
@@ -136,7 +136,7 @@ jobs:
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           version: v0.70.0
-          image-ref: '${{ matrix.image.repo }}:${{ steps.get-tag.outputs.tag }}'
+          image-ref: '${{ steps.get-ref.outputs.ref }}'
           format: 'table'
           severity: 'CRITICAL,HIGH,MEDIUM'
           exit-code: '0'
@@ -145,7 +145,7 @@ jobs:
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           version: v0.70.0
-          image-ref: '${{ matrix.image.repo }}:${{ steps.get-tag.outputs.tag }}'
+          image-ref: '${{ steps.get-ref.outputs.ref }}'
           format: 'json'
           output: 'trivy-${{ matrix.image.name }}.json'
           severity: 'CRITICAL,HIGH,MEDIUM,LOW'
@@ -282,10 +282,12 @@ jobs:
             sudo chmod +x /usr/local/bin/yq
           fi
 
-          # Extract versions from values.yaml
+          # Extract versions from values.yaml.
+          # PostgreSQL is configured via cnpg.imageName (full ref); strip the
+          # repo prefix to get just the tag for display.
           SYNAPSE_VERSION=$(yq eval '.synapse.image.tag' values.yaml | tr -d '"')
           ELEMENT_VERSION=$(yq eval '.element.image.tag' values.yaml | tr -d '"')
-          POSTGRES_VERSION=$(yq eval '.postgresql.image.tag' values.yaml | tr -d '"')
+          POSTGRES_VERSION=$(yq eval '.postgresql.cnpg.imageName' values.yaml | awk -F: '{print $NF}' | tr -d '"')
           COTURN_VERSION=$(yq eval '.coturn.image.tag' values.yaml | tr -d '"')
 
           echo "Extracted versions:"
@@ -440,7 +442,7 @@ jobs:
 
           SYNAPSE_VERSION=$(yq eval '.synapse.image.tag' values.yaml | tr -d '"')
           ELEMENT_VERSION=$(yq eval '.element.image.tag' values.yaml | tr -d '"')
-          POSTGRES_VERSION=$(yq eval '.postgresql.image.tag' values.yaml | tr -d '"')
+          POSTGRES_VERSION=$(yq eval '.postgresql.cnpg.imageName' values.yaml | awk -F: '{print $NF}' | tr -d '"')
           COTURN_VERSION=$(yq eval '.coturn.image.tag' values.yaml | tr -d '"')
 
           # Extract per-image counts
