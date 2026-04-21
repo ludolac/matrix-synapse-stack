@@ -10,6 +10,19 @@ secrets:
   # Set to false and create secrets manually using ./scripts/generate-secrets.sh
   autoGenerate: false
 
+# Bootstrap the target Namespace as part of the chart.
+# Useful for GitOps / ArgoCD: the Namespace is created with sync-wave -10 so
+# it exists before any PreSync hook runs. Leave disabled for plain
+# `helm install --create-namespace` usage.
+namespace:
+  create: false
+  # ArgoCD sync-wave (lower = applied earlier). -10 is conventional for
+  # bootstrap resources that must exist before everything else.
+  syncWave: "-10"
+  # Extra annotations / labels on the Namespace (merged with the defaults).
+  annotations: {}
+  labels: {}
+
 # Synapse image configuration
 synapse:
   image:
