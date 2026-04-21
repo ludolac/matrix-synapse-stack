@@ -47,11 +47,12 @@ data:
     # Registration
     enable_registration: {{ .Values.synapse.server.registration.enabled }}
     enable_registration_without_verification: false
-    {{- if .Values.synapse.server.registration.enabled }}
+    {{- if and .Values.synapse.server.registration.enabled .Values.synapse.server.registration.requireEmail }}
+    # Only emitted when there is at least one 3PID requirement. Emitting the key
+    # with an empty/null value makes Synapse crash with:
+    # TypeError: argument of type 'NoneType' is not iterable
     registrations_require_3pid:
-      {{- if .Values.synapse.server.registration.requireEmail }}
       - email
-      {{- end }}
     {{- end }}
     allow_guest_access: {{ .Values.synapse.server.registration.allowGuests }}
 
