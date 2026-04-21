@@ -65,6 +65,16 @@ spec:
             - name: turns-tcp
               containerPort: 5349
               protocol: TCP
+            {{- if .Values.coturn.service.publishRelayPorts }}
+            # Relay ports exposed on the Service - declared here for
+            # documentation; kube-proxy forwards to these numeric ports
+            # regardless of containerPort presence.
+            {{- range $port := untilStep (int .Values.coturn.relayPortRange.min) (int (add .Values.coturn.relayPortRange.max 1)) 1 }}
+            - name: relay-{{ $port }}
+              containerPort: {{ $port }}
+              protocol: UDP
+            {{- end }}
+            {{- end }}
             {{- if .Values.coturn.prometheusExporter.enabled }}
             - name: metrics
               containerPort: {{ .Values.coturn.prometheusExporter.port }}

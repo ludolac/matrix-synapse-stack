@@ -708,7 +708,15 @@ coturn:
   service:
     # Service type: LoadBalancer, NodePort, or ClusterIP
     type: LoadBalancer
-    
+
+    # Publish the whole relayPortRange on the Service.
+    # Required when coturn sits behind a LoadBalancer, otherwise media
+    # traffic cannot reach the pod (only signaling on 3478/5349 works).
+    # WARNING: Kubernetes caps a Service at ~32 ports — keep the range small
+    # ((max - min) <= 27, leaving room for signaling + metrics) or use
+    # hostNetwork on the pod if you need a larger range.
+    publishRelayPorts: false
+
     # Load balancer IP (optional)
     loadBalancerIP: ""
     

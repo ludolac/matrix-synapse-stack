@@ -64,6 +64,19 @@ spec:
       {{- if and (eq .Values.coturn.service.type "NodePort") .Values.coturn.service.nodePorts.turnsTcp }}
       nodePort: {{ .Values.coturn.service.nodePorts.turnsTcp }}
       {{- end }}
+    {{- if .Values.coturn.service.publishRelayPorts }}
+    # Relay ports (coturn binds media traffic to UDP ports in relayPortRange).
+    # Without this, only signaling (3478/5349) reaches the pod and media
+    # flows silently fail when a LoadBalancer sits in front of coturn.
+    # Kubernetes caps a Service at ~32 ports (implementation-dependent) — keep
+    # (max - min) small (<= 27) since 4 signaling + 1 metrics ports are reserved.
+    {{- range $port := untilStep (int .Values.coturn.relayPortRange.min) (int (add .Values.coturn.relayPortRange.max 1)) 1 }}
+    - name: relay-{{ $port }}
+      port: {{ $port }}
+      targetPort: {{ $port }}
+      protocol: UDP
+    {{- end }}
+    {{- end }}
     {{- if .Values.coturn.prometheusExporter.enabled }}
     # Prometheus metrics
     - name: metrics
