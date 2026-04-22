@@ -23,9 +23,19 @@ data:
       # Disable the port range (we rely exclusively on udp_mux).
       port_range_start: 0
       port_range_end: 0
-      # Needed when running behind a LoadBalancer: announce the public IP
-      # in ICE candidates so clients can reach the SFU.
+      {{- if .Values.rtc.livekit.service.publicIP }}
+      # Explicit 1:1 NAT mapping. On OVH Managed Kubernetes (and other CNIs
+      # where nodes sit behind a LB with SNAT), `use_external_ip: true` runs
+      # STUN against an external server and learns the NODE IP, not the LB IP
+      # — ICE candidates then reference an unroutable address and connectivity
+      # fails. When the public IP is known up-front, pin it here.
+      nat_1to1_ips:
+        - {{ .Values.rtc.livekit.service.publicIP | quote }}
+      {{- else }}
+      # STUN-based public IP discovery. Works on flat networks (node has a
+      # public IP) but breaks behind a NAT LoadBalancer — use publicIP instead.
       use_external_ip: true
+      {{- end }}
       # ICE-Lite: SFU does not act as full ICE agent, simplifies NAT in SFU
       # deployments where clients initiate the connection.
       use_ice_lite: true

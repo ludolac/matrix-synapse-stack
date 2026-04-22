@@ -991,6 +991,12 @@ rtc:
         # loadbalancer.ovhcloud.com/l4-protocol: udp
       loadBalancerIP: ""
       externalTrafficPolicy: Cluster  # Local preserves client IP but needs DSR support
+      # Public IP of the UDP LoadBalancer (ICE nat_1to1_ips). REQUIRED on OVH
+      # Managed Kubernetes (and any CNI where nodes sit behind a NAT'd LB) —
+      # use_external_ip returns the node IP via STUN instead of the LB IP,
+      # making ICE candidates unroutable. Leave empty only if your nodes have
+      # public IPs directly (K3s / bare metal).
+      publicIP: ""
       # external-dns hostname for the UDP endpoint.
       externalDns:
         enabled: false
