@@ -56,7 +56,7 @@ data:
       max_participants: 16         # Element Call default cap
       empty_timeout: 300           # 5 min after last participant leaves
 
-    # Health / readiness endpoint
-    health:
-      enabled: true
+    # Note: livekit-server does not accept a top-level `health:` block.
+    # Health is always served on the signaling port (HTTP GET / returns 200).
+    # Probes in the Deployment hit that path directly.
 {{- end }}

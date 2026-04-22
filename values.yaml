@@ -917,7 +917,8 @@ rtc:
   jwtService:
     image:
       repository: ghcr.io/element-hq/lk-jwt-service
-      tag: "v0.4.2"
+      # NOTE: ghcr publishes without the "v" prefix (0.4.4, not v0.4.4).
+      tag: "0.4.4"
       pullPolicy: IfNotPresent
     replicaCount: 1
 

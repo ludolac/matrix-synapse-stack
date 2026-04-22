@@ -1,4 +1,32 @@
 {{- if .Values.rtc.enabled }}
+# Traefik middlewares: strip the /livekit/jwt and /livekit/sfu prefixes
+# before forwarding to the backends. Both services listen on "/" internally
+# (no prefix awareness): without strip, the pod receives /livekit/jwt/... and
+# returns 404 since it only knows /get_token, /healthz, etc.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-strip-livekit-jwt
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rtc-backend
+spec:
+  stripPrefix:
+    prefixes:
+      - /livekit/jwt
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-strip-livekit-sfu
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rtc-backend
+spec:
+  stripPrefix:
+    prefixes:
+      - /livekit/sfu
+---
 # Element Call SPA: https://call.<domain>
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -29,17 +57,21 @@ spec:
                 port:
                   number: 80
 ---
-# MatrixRTC backend: https://matrix-rtc.<domain>
-#   /livekit/jwt/  -> lk-jwt-service (authorization + JWT issuance)
-#   /livekit/sfu/  -> LiveKit signaling (WebSocket upgrade)
+# MatrixRTC backend — split into two Ingress resources so that each gets
+# its own stripPrefix middleware (router.middlewares is Ingress-scoped in
+# Traefik's K8s Ingress controller, so a single Ingress can't apply
+# different middlewares to different paths).
+
+# /livekit/jwt -> lk-jwt-service (strip prefix so pod sees /get_token, /healthz)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "matrix-synapse.fullname" . }}-rtc-backend
+  name: {{ include "matrix-synapse.fullname" . }}-rtc-jwt
   labels:
     {{- include "matrix-synapse.labels" . | nindent 4 }}
     app.kubernetes.io/component: rtc-backend
   annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: "{{ .Release.Namespace }}-{{ include "matrix-synapse.fullname" . }}-strip-livekit-jwt@kubernetescrd"
     {{- with .Values.rtc.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
@@ -60,6 +92,30 @@ spec:
                 name: {{ include "matrix-synapse.fullname" . }}-lk-jwt-service
                 port:
                   number: 8080
+---
+# /livekit/sfu -> LiveKit SFU signaling (WebSocket upgrade + HTTP)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-rtc-sfu
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rtc-backend
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: "{{ .Release.Namespace }}-{{ include "matrix-synapse.fullname" . }}-strip-livekit-sfu@kubernetescrd"
+    {{- with .Values.rtc.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.rtc.ingress.className }}
+  tls:
+    - hosts:
+        - {{ .Values.rtc.ingress.backend.host }}
+      secretName: {{ .Values.rtc.ingress.backend.tls.secretName }}
+  rules:
+    - host: {{ .Values.rtc.ingress.backend.host }}
+      http:
+        paths:
           - path: /livekit/sfu
             pathType: Prefix
             backend:

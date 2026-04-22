@@ -1177,7 +1177,7 @@ Disabled by default. Enable with `rtc.enabled: true`.
 | Component | Image | Port(s) | Purpose |
 |-----------|-------|---------|---------|
 | LiveKit SFU | `livekit/livekit-server:v1.11.0` | TCP 7880 (WSS), UDP 7882 (muxed media) | WebRTC media relay |
-| lk-jwt-service | `ghcr.io/element-hq/lk-jwt-service:v0.4.2` | TCP 8080 | Validates Matrix OpenID tokens, signs LiveKit JWTs |
+| lk-jwt-service | `ghcr.io/element-hq/lk-jwt-service:0.4.4` | TCP 8080 | Validates Matrix OpenID tokens, signs LiveKit JWTs |
 | Element Call (SPA) | `ghcr.io/element-hq/element-call:v0.19.1` | TCP 80 | Web app loaded as widget by Element Web |
 
 Synapse is automatically reconfigured with `experimental_features.msc3266_enabled` +
@@ -1633,7 +1633,7 @@ This Helm chart is licensed under the **MIT License** - see [LICENSE](LICENSE) f
 - **Coturn Version**: 4.10-alpine
 - **MatrixRTC (opt-in via `rtc.enabled=true`)**:
   - LiveKit SFU: `livekit/livekit-server:v1.11.0`
-  - lk-jwt-service: `ghcr.io/element-hq/lk-jwt-service:v0.4.2`
+  - lk-jwt-service: `ghcr.io/element-hq/lk-jwt-service:0.4.4`
   - Element Call: `ghcr.io/element-hq/element-call:v0.19.1`
 
 **Maintainer**: WAADOO - contact@waadoo.ovh
