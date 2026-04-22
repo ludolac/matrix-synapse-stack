@@ -38,15 +38,13 @@ data:
         - 192.168.0.0/16
 
     database:
-      host: {{ include "matrix-synapse.postgresql.host" . | quote }}
-      port: {{ include "matrix-synapse.postgresql.port" . }}
-      database: {{ .Values.mas.database.name | quote }}
+      # Single URI form (MAS 1.15+ parses this reliably; the split
+      # host/port/username/database/password form misbehaves with password
+      # values that arrive via env templating).
       # MAS reuses the Synapse PostgreSQL role as owner of mas_prod (see
       # mas-database.yaml). Dev-friendly; for strong isolation, add a dedicated
       # role via CNPG managed.roles and override mas.database.username.
-      username: {{ .Values.postgresql.username | quote }}
-      # Password injected at startup from Secret env var
-      password: "{{"{{"}} env(name='DATABASE_PASSWORD') {{"}}"}}"
+      uri: "postgresql://{{ .Values.postgresql.username }}:{{"{{"}} env(name='DATABASE_PASSWORD') {{"}}"}}@{{ include "matrix-synapse.postgresql.host" . }}:{{ include "matrix-synapse.postgresql.port" . }}/{{ .Values.mas.database.name }}"
 
     secrets:
       encryption: "{{"{{"}} env(name='ENCRYPTION_KEY') {{"}}"}}"
