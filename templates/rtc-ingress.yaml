@@ -71,9 +71,24 @@ metadata:
     {{- include "matrix-synapse.labels" . | nindent 4 }}
     app.kubernetes.io/component: rtc-backend
   annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: "{{ .Release.Namespace }}-{{ include "matrix-synapse.fullname" . }}-strip-livekit-jwt@kubernetescrd"
+    # Merge the chart's stripPrefix middleware with any user-supplied
+    # router.middlewares (e.g. secure-chain, rate-limit). If we just did
+    # `toYaml .Values.rtc.ingress.annotations`, the user's middlewares would
+    # overwrite the strip and /livekit/jwt/... would 404 at the backend.
+    {{- $stripMw := printf "%s-%s-strip-livekit-jwt@kubernetescrd" .Release.Namespace (include "matrix-synapse.fullname" .) }}
+    {{- $userMw := "" }}
     {{- with .Values.rtc.ingress.annotations }}
-    {{- toYaml . | nindent 4 }}
+    {{- $userMw = index . "traefik.ingress.kubernetes.io/router.middlewares" | default "" }}
+    {{- end }}
+    {{- if $userMw }}
+    traefik.ingress.kubernetes.io/router.middlewares: "{{ $userMw }},{{ $stripMw }}"
+    {{- else }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ $stripMw | quote }}
+    {{- end }}
+    {{- range $k, $v := .Values.rtc.ingress.annotations }}
+    {{- if ne $k "traefik.ingress.kubernetes.io/router.middlewares" }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
     {{- end }}
 spec:
   ingressClassName: {{ .Values.rtc.ingress.className }}
@@ -102,9 +117,21 @@ metadata:
     {{- include "matrix-synapse.labels" . | nindent 4 }}
     app.kubernetes.io/component: rtc-backend
   annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: "{{ .Release.Namespace }}-{{ include "matrix-synapse.fullname" . }}-strip-livekit-sfu@kubernetescrd"
+    # Same merge logic as the rtc-jwt Ingress above.
+    {{- $stripMw := printf "%s-%s-strip-livekit-sfu@kubernetescrd" .Release.Namespace (include "matrix-synapse.fullname" .) }}
+    {{- $userMw := "" }}
     {{- with .Values.rtc.ingress.annotations }}
-    {{- toYaml . | nindent 4 }}
+    {{- $userMw = index . "traefik.ingress.kubernetes.io/router.middlewares" | default "" }}
+    {{- end }}
+    {{- if $userMw }}
+    traefik.ingress.kubernetes.io/router.middlewares: "{{ $userMw }},{{ $stripMw }}"
+    {{- else }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ $stripMw | quote }}
+    {{- end }}
+    {{- range $k, $v := .Values.rtc.ingress.annotations }}
+    {{- if ne $k "traefik.ingress.kubernetes.io/router.middlewares" }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
     {{- end }}
 spec:
   ingressClassName: {{ .Values.rtc.ingress.className }}
