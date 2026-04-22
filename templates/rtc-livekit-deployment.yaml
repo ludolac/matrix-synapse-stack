@@ -82,6 +82,11 @@ spec:
         - name: keys
           secret:
             secretName: {{ .Values.rtc.livekit.existingSecret | default (printf "%s-livekit" (include "matrix-synapse.fullname" .)) }}
+            # LiveKit rejects world-readable key files. Default K8s secret
+            # volume mode is 0644 (r--r--r--) -> LiveKit refuses to start.
+            # 0400 + fsGroup=1000 lets UID 1000 read via group ownership
+            # (kubelet chowns the file to root:<fsGroup>).
+            defaultMode: 0400
             items:
               - key: keys.yaml
                 path: keys.yaml
