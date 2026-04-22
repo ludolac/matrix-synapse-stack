@@ -24,13 +24,14 @@ data:
       port_range_start: 0
       port_range_end: 0
       {{- if .Values.rtc.livekit.service.publicIP }}
-      # Explicit 1:1 NAT mapping. On OVH Managed Kubernetes (and other CNIs
-      # where nodes sit behind a LB with SNAT), `use_external_ip: true` runs
-      # STUN against an external server and learns the NODE IP, not the LB IP
-      # — ICE candidates then reference an unroutable address and connectivity
-      # fails. When the public IP is known up-front, pin it here.
-      nat_1to1_ips:
-        - {{ .Values.rtc.livekit.service.publicIP | quote }}
+      # Force the advertised IP in ICE candidates (LiveKit v1.11+).
+      # On OVH Managed Kubernetes (and other CNIs where nodes sit behind a LB
+      # with SNAT), `use_external_ip: true` learns the NODE IP via STUN, not
+      # the LB IP — ICE candidates reference an unroutable address and
+      # WebRTC connectivity fails.
+      # NOTE: the config key is `node_ip` (single string) in LiveKit v1.11+.
+      # `nat_1to1_ips` from older LiveKit versions is rejected at config load.
+      node_ip: {{ .Values.rtc.livekit.service.publicIP | quote }}
       {{- else }}
       # STUN-based public IP discovery. Works on flat networks (node has a
       # public IP) but breaks behind a NAT LoadBalancer — use publicIP instead.
