@@ -170,42 +170,8 @@ postgres-password
 {{- end }}
 
 {{/*
-Environment variables injected into MAS containers. Keeps all secret
-references (DB password, encryption key, signing key, Synapse client secret,
-upstream OIDC client secrets) DRY between initContainer (db-migrate) and the
-main server container.
+Former helper matrix-synapse.mas.envSecrets was removed in chart 2.0.x — MAS
+now loads secrets via a render-config init container that substitutes ${VAR}
+placeholders in the config YAML (MAS does not apply Tera to config.yaml,
+only to HTML templates). See templates/mas-deployment.yaml.
 */}}
-{{- define "matrix-synapse.mas.envSecrets" -}}
-- name: DATABASE_PASSWORD
-  valueFrom:
-    secretKeyRef:
-      name: {{ include "matrix-synapse.postgresql.secretName" . }}
-      key: {{ include "matrix-synapse.postgresql.secretPasswordKey" . }}
-- name: ENCRYPTION_KEY
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.mas.existingSecret }}
-      key: ENCRYPTION_KEY
-- name: SIGNING_KEY_RSA
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.mas.existingSecret }}
-      key: SIGNING_KEY_RSA
-- name: SYNAPSE_SHARED_SECRET
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.mas.existingSecret }}
-      key: SYNAPSE_SHARED_SECRET
-- name: SYNAPSE_CLIENT_SECRET
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.mas.existingSecret }}
-      key: SYNAPSE_CLIENT_SECRET
-{{- range $provider := .Values.mas.upstreamOauth2.providers }}
-- name: {{ $provider.clientSecretKey | default (printf "UPSTREAM_%s_CLIENT_SECRET" (upper $provider.id)) }}
-  valueFrom:
-    secretKeyRef:
-      name: {{ $.Values.mas.existingSecret }}
-      key: {{ $provider.clientSecretKey | default (printf "UPSTREAM_%s_CLIENT_SECRET" (upper $provider.id)) }}
-{{- end }}
-{{- end }}

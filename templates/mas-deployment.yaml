@@ -23,8 +23,74 @@ spec:
       serviceAccountName: {{ include "matrix-synapse.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.mas.podSecurityContext | nindent 8 }}
-      # Run DB migrations before the main container starts. Idempotent.
       initContainers:
+        # 1/ Render the config: substitute ${VAR} placeholders in the template
+        # ConfigMap with env values (DB password from CNPG, static secrets from
+        # mas.existingSecret). Output goes to the shared composed-config volume.
+        #
+        # We do this ourselves because MAS does NOT apply Tera templating to
+        # config.yaml — placeholders would otherwise be read as literal strings.
+        - name: render-config
+          image: busybox:1.36
+          command: ['sh', '-c']
+          args:
+            - |
+              set -eu
+              # The RSA private key is multi-line. awk would keep its internal
+              # indent and mismatch the placeholder line indent (YAML would
+              # fail to parse the `key: |` block scalar). So for that specific
+              # placeholder we split the key into lines and prefix EACH line
+              # with the whitespace of the placeholder line. All other
+              # ${VAR} tokens are substituted inline.
+              awk '
+                BEGIN {
+                  n_key_lines = split(ENVIRON["SIGNING_KEY_RSA"], key_lines, "\n")
+                }
+                {
+                  line = $0
+                  if (line ~ /\$\{SIGNING_KEY_RSA\}/) {
+                    match(line, /^[[:space:]]*/)
+                    indent = (RLENGTH > 0) ? substr(line, 1, RLENGTH) : ""
+                    for (i = 1; i <= n_key_lines; i++) {
+                      print indent key_lines[i]
+                    }
+                  } else {
+                    for (e in ENVIRON) {
+                      token = "\\$\\{" e "\\}"
+                      gsub(token, ENVIRON[e], line)
+                    }
+                    print line
+                  }
+                }
+              ' /config-template/config.yaml > /composed/config.yaml
+              chmod 0400 /composed/config.yaml
+          env:
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "matrix-synapse.postgresql.secretName" . }}
+                  key: {{ include "matrix-synapse.postgresql.secretPasswordKey" . }}
+          envFrom:
+            - secretRef:
+                # All static MAS secrets (ENCRYPTION_KEY, SIGNING_KEY_RSA_INDENTED,
+                # SYNAPSE_CLIENT_SECRET, SYNAPSE_SHARED_SECRET, UPSTREAM_*_CLIENT_SECRET).
+                name: {{ .Values.mas.existingSecret }}
+          volumeMounts:
+            - name: config-template
+              mountPath: /config-template
+              readOnly: true
+            - name: composed-config
+              mountPath: /composed
+          securityContext:
+            # busybox runs any UID; keep the main container's non-root context
+            # but let the init container write to the shared emptyDir.
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001
+        # 2/ Run DB migrations before the main container starts (idempotent).
         - name: db-migrate
           image: "{{ .Values.mas.image.repository }}:{{ .Values.mas.image.tag }}"
           imagePullPolicy: {{ .Values.mas.image.pullPolicy }}
@@ -32,12 +98,10 @@ spec:
             - database
             - migrate
             - --config
-            - /etc/mas/config.yaml
-          env:
-            {{- include "matrix-synapse.mas.envSecrets" . | nindent 12 }}
+            - /composed/config.yaml
           volumeMounts:
-            - name: config
-              mountPath: /etc/mas
+            - name: composed-config
+              mountPath: /composed
               readOnly: true
           securityContext:
             {{- toYaml .Values.mas.securityContext | nindent 12 }}
@@ -50,9 +114,7 @@ spec:
           args:
             - server
             - --config
-            - /etc/mas/config.yaml
-          env:
-            {{- include "matrix-synapse.mas.envSecrets" . | nindent 12 }}
+            - /composed/config.yaml
           ports:
             - name: http
               containerPort: 8080
@@ -75,16 +137,18 @@ spec:
           resources:
             {{- toYaml .Values.mas.resources | nindent 12 }}
           volumeMounts:
-            - name: config
-              mountPath: /etc/mas
+            - name: composed-config
+              mountPath: /composed
               readOnly: true
             # MAS writes a handful of transient files at startup; tmpfs is fine.
             - name: tmp
               mountPath: /tmp
       volumes:
-        - name: config
+        - name: config-template
           configMap:
             name: {{ include "matrix-synapse.fullname" . }}-mas-config
+        - name: composed-config
+          emptyDir: {}
         - name: tmp
           emptyDir: {}
       {{- with .Values.mas.nodeSelector }}

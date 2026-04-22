@@ -64,13 +64,23 @@ else
 fi
 
 echo "Creating Kubernetes secret $SECRET_NAME in namespace $NAMESPACE..."
-kubectl -n "$NAMESPACE" create secret generic "$SECRET_NAME" \
-  --from-literal=ENCRYPTION_KEY="$ENCRYPTION_KEY" \
-  --from-literal=SIGNING_KEY_RSA="$SIGNING_KEY_RSA" \
-  --from-literal=SYNAPSE_CLIENT_SECRET="$SYNAPSE_CLIENT_SECRET" \
-  --from-literal=SYNAPSE_SHARED_SECRET="$SYNAPSE_SHARED_SECRET" \
-  --from-literal=UPSTREAM_AUTHELIA_CLIENT_SECRET="$UPSTREAM_SECRET" \
-  --dry-run=client -o yaml | kubectl apply -f -
+# Using a YAML manifest via heredoc so multi-line values (RSA PEM) are preserved
+# properly — `kubectl create secret --from-literal` doesn't handle newlines well.
+kubectl -n "$NAMESPACE" apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: $SECRET_NAME
+  namespace: $NAMESPACE
+type: Opaque
+stringData:
+  ENCRYPTION_KEY: "$ENCRYPTION_KEY"
+  SIGNING_KEY_RSA: |
+$(printf '%s\n' "$SIGNING_KEY_RSA" | sed 's/^/    /')
+  SYNAPSE_CLIENT_SECRET: "$SYNAPSE_CLIENT_SECRET"
+  SYNAPSE_SHARED_SECRET: "$SYNAPSE_SHARED_SECRET"
+  UPSTREAM_AUTHELIA_CLIENT_SECRET: "$UPSTREAM_SECRET"
+EOF
 
 cat <<EOF
 

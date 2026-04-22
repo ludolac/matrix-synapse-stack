@@ -13,8 +13,16 @@ metadata:
     {{- include "matrix-synapse.labels" . | nindent 4 }}
     app.kubernetes.io/component: mas
 data:
-  # MAS uses Tera templating to inject env vars at startup (see {{"{{"}} env(name=...) {{"}}"}} below).
-  # This keeps all secrets out of the ConfigMap while centralizing config.
+  # This ConfigMap is a TEMPLATE, not the final config.
+  # Placeholders (${VAR}) are substituted at pod startup by the render-config
+  # init container (busybox+awk) using env vars sourced from:
+  #   - CNPG app Secret (DATABASE_PASSWORD)
+  #   - mas.existingSecret (ENCRYPTION_KEY, SIGNING_KEY_RSA_INDENTED,
+  #     SYNAPSE_CLIENT_SECRET, SYNAPSE_SHARED_SECRET, UPSTREAM_*_CLIENT_SECRET)
+  #
+  # Rationale: MAS does NOT apply Tera templating to config.yaml (only to HTML
+  # templates), so {{"{{"}} env(name='...') {{"}}"}} is treated as a literal string.
+  # We render ourselves, like Synapse and ess-helm do.
   config.yaml: |
     http:
       listeners:
@@ -38,33 +46,25 @@ data:
         - 192.168.0.0/16
 
     database:
-      # Single URI form (MAS 1.15+ parses this reliably; the split
-      # host/port/username/database/password form misbehaves with password
-      # values that arrive via env templating).
-      # MAS reuses the Synapse PostgreSQL role as owner of mas_prod (see
-      # mas-database.yaml). Dev-friendly; for strong isolation, add a dedicated
-      # role via CNPG managed.roles and override mas.database.username.
-      uri: "postgresql://{{ .Values.postgresql.username }}:{{"{{"}} env(name='DATABASE_PASSWORD') {{"}}"}}@{{ include "matrix-synapse.postgresql.host" . }}:{{ include "matrix-synapse.postgresql.port" . }}/{{ .Values.mas.database.name }}"
+      uri: "postgresql://{{ .Values.postgresql.username }}:${DATABASE_PASSWORD}@{{ include "matrix-synapse.postgresql.host" . }}:{{ include "matrix-synapse.postgresql.port" . }}/{{ .Values.mas.database.name }}"
 
     secrets:
-      encryption: "{{"{{"}} env(name='ENCRYPTION_KEY') {{"}}"}}"
+      encryption: "${ENCRYPTION_KEY}"
       keys:
         - kid: "rsa-1"
           key: |
-            {{"{{"}} env(name='SIGNING_KEY_RSA') | indent(12) {{"}}"}}
+            ${SIGNING_KEY_RSA}
 
     matrix:
       homeserver: {{ .Values.synapse.server.name | quote }}
-      # Admin token Synapse uses to call the MAS admin API and vice versa.
-      secret: "{{"{{"}} env(name='SYNAPSE_SHARED_SECRET') {{"}}"}}"
+      secret: "${SYNAPSE_SHARED_SECRET}"
       endpoint: "http://{{ include "matrix-synapse.fullname" . }}-synapse.{{ .Release.Namespace }}.svc.cluster.local"
 
     clients:
-      # Synapse is registered as an OAuth2 client of MAS.
       # client_id must be exactly "0000000000000000000SYNAPSE" (18 zeros + SYNAPSE).
       - client_id: "0000000000000000000SYNAPSE"
         client_auth_method: client_secret_basic
-        client_secret: "{{"{{"}} env(name='SYNAPSE_CLIENT_SECRET') {{"}}"}}"
+        client_secret: "${SYNAPSE_CLIENT_SECRET}"
 
     upstream_oauth2:
       providers:
@@ -75,7 +75,9 @@ data:
           human_name: {{ . | quote }}
           {{- end }}
           client_id: {{ $provider.clientId | quote }}
-          client_secret: "{{"{{"}} env(name={{ $provider.clientSecretKey | default (printf "UPSTREAM_%s_CLIENT_SECRET" (upper $provider.id)) | quote }}) {{"}}"}}"
+          {{- /* Placeholder key defaults to UPSTREAM_<ID>_CLIENT_SECRET (upper-cased) */ -}}
+          {{- $envKey := $provider.clientSecretKey | default (printf "UPSTREAM_%s_CLIENT_SECRET" (upper $provider.id)) }}
+          client_secret: "${{"{"}}{{ $envKey }}{{"}"}}"
           token_endpoint_auth_method: {{ $provider.tokenEndpointAuthMethod | default "client_secret_basic" | quote }}
           scope: {{ $provider.scope | default "openid profile email" | quote }}
           claims_imports:
@@ -94,14 +96,12 @@ data:
               template: {{ $claims.email | default "{{ user.email }}" | quote }}
         {{- end }}
 
-    # Disable local password auth — we are OIDC-only.
     passwords:
       enabled: false
 
     account:
       password_registration_enabled: false
       login_with_email_allowed: false
-      # User registration happens implicitly via upstream OIDC on first login.
       registration_enabled: true
       registration_mode: "oidc"
 
@@ -115,7 +115,4 @@ data:
         exporter: prometheus
         binds:
           - address: '[::]:9090'
-
-    # Policy for admin rights — use `mas-cli manage set-admin <localpart>` once
-    # the first user has logged in via upstream OIDC. See README.
 {{- end }}
