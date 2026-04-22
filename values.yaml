@@ -150,6 +150,10 @@ synapse:
       requireTransportSecurity: true
       notifFrom: "Matrix <noreply@example.com>"
       appName: "Matrix"
+      # Public URL of the Element Web instance. Used in room-invite email
+      # links (e.g. "Accept invite" button). Leave empty to fall back to
+      # Synapse's default (https://app.element.io).
+      clientBaseUrl: ""
 
     # Multi-Factor Authentication (MFA) / Two-Factor Authentication (2FA)
     mfa:

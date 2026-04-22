@@ -148,6 +148,12 @@ data:
       require_transport_security: {{ .Values.synapse.server.email.requireTransportSecurity }}
       notif_from: "{{ .Values.synapse.server.email.notifFrom }}"
       app_name: "{{ .Values.synapse.server.email.appName }}"
+      {{- if .Values.synapse.server.email.clientBaseUrl }}
+      # Public URL of the Element Web instance. Used in room-invite emails so
+      # links open in the self-hosted client instead of the default
+      # https://app.element.io.
+      client_base_url: "{{ .Values.synapse.server.email.clientBaseUrl }}"
+      {{- end }}
     {{- end }}
 
     # Report stats
