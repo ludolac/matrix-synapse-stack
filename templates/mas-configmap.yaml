@@ -35,6 +35,9 @@ data:
             - name: graphql
               playground: false
             - name: assets
+            # /health endpoint hit by the Deployment's liveness & readiness
+            # probes — omitting this gets 404 and the pod never goes Ready.
+            - name: health
           binds:
             - address: '[::]:8080'
           proxy_protocol: false
