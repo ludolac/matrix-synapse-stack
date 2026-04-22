@@ -193,6 +193,13 @@ data:
         client_auth_method: client_secret_basic
         client_secret: "${SYNAPSE_MAS_CLIENT_SECRET}"
         admin_token: "${SYNAPSE_MAS_SHARED_SECRET}"
+      {{- if .Values.mas.qrCodeLoginEnabled }}
+      # MSC4108: device-to-device QR code sign-in (Element X / Element Web).
+      # Only makes sense with MAS: the new client authenticates via a secure
+      # out-of-band channel that reuses the MSC3861 OAuth2 token issuance.
+      # Without this, clients display "QR code not supported".
+      msc4108_enabled: true
+      {{- end }}
       {{- end }}
     {{- if .Values.rtc.enabled }}
     # Maximum lifetime for a delayed event (keep calls from leaking forever)

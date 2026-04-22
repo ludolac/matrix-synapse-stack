@@ -842,6 +842,11 @@ coturn:
 mas:
   enabled: false
 
+  # Enable device-to-device QR code sign-in (MSC4108). Only meaningful with
+  # mas.enabled=true: the feature requires delegated auth. Disable only if you
+  # want to enforce non-QR flows for some reason.
+  qrCodeLoginEnabled: true
+
   image:
     repository: ghcr.io/element-hq/matrix-authentication-service
     tag: "1.15.0"
