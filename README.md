@@ -1202,27 +1202,29 @@ enabled.
 ```
 
 2. **Update Authelia** to accept the new redirect URI. On your existing
-   `matrix` OIDC client, add (keep `client_id` and `client_secret` unchanged):
+   `matrix` OIDC client, add (keep `client_id` and `client_secret` unchanged).
+   Pick a dedicated hostname for MAS (e.g. `mas.<domain>`) — **do not reuse
+   the hostname of your Authelia**, both services need their own Ingress.
    ```yaml
    redirect_uris:
-     - https://auth.waadoo.ovh/upstream/callback/authelia
+     - https://mas.waadoo.ovh/upstream/callback/authelia
    ```
 
-3. **Values**:
+3. **Values** (Authelia stays at `auth.waadoo.ovh`, MAS gets `mas.waadoo.ovh`):
    ```yaml
    mas:
      enabled: true
-     publicUrl: "https://auth.waadoo.ovh/"
+     publicUrl: "https://mas.waadoo.ovh/"
      existingSecret: matrix-synapse-mas-secrets
      ingress:
-       host: auth.waadoo.ovh
+       host: mas.waadoo.ovh
        tls:
          secretName: matrix-mas-tls
      upstreamOauth2:
        providers:
          - id: authelia
            humanName: "Waadoo SSO"
-           issuer: https://authelia.waadoo.ovh
+           issuer: https://auth.waadoo.ovh    # your existing Authelia
            clientId: matrix
            clientSecretKey: UPSTREAM_AUTHELIA_CLIENT_SECRET
            scope: "openid profile email"
@@ -1246,7 +1248,7 @@ curl https://matrix.waadoo.ovh/.well-known/matrix/client | \
   jq '."org.matrix.msc2965.authentication"'
 
 # MAS health
-curl https://auth.waadoo.ovh/health
+curl https://mas.waadoo.ovh/health
 
 # Synapse logs (should confirm MSC3861 active)
 kubectl logs -n matrix deploy/matrix-synapse-synapse --tail=50 | grep -i mas

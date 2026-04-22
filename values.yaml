@@ -850,8 +850,10 @@ mas:
   replicaCount: 1
 
   # Public URL of MAS — advertised via .well-known and used by Synapse as the
-  # OAuth2 issuer. Must match the Ingress host.
-  publicUrl: "https://auth.example.com/"
+  # OAuth2 issuer. Must match the Ingress host. Pick a hostname dedicated to
+  # MAS (e.g. mas.<domain>) — do NOT reuse the hostname of your upstream IdP
+  # (Authelia / Keycloak) since both need to be reachable independently.
+  publicUrl: "https://mas.example.com/"
 
   # Database. MAS requires its own PostgreSQL database (not shared with Synapse).
   # When postgresql.mode=cnpg, the chart can provision a dedicated DB via the
@@ -896,7 +898,8 @@ mas:
   # Ingress (HTTPS UI + OAuth endpoints). MAS listens on 8080 internally.
   ingress:
     className: "traefik"
-    host: "auth.example.com"
+    # Must match the hostname in publicUrl above.
+    host: "mas.example.com"
     annotations:
       cert-manager.io/cluster-issuer: "letsencrypt-prod"
       traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
