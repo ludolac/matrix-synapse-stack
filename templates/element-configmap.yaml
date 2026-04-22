@@ -43,8 +43,20 @@ data:
         "theme": "dark"
       },
       "features": {
-        "feature_url_previews": "enable"
+        "feature_url_previews": "enable"{{- if .Values.rtc.enabled }},
+        "feature_group_calls": "enable",
+        "feature_video_rooms": "enable",
+        "feature_element_call_video_rooms": "enable"
+        {{- end }}
       },
+      {{- if .Values.rtc.enabled }}
+      "element_call": {
+        "url": "https://{{ .Values.rtc.ingress.call.host }}",
+        "use_exclusively": false,
+        "participant_limit": 8,
+        "brand": "Element Call"
+      },
+      {{- end }}
       "jitsi": {
         "preferred_domain": "meet.jit.si"
       }{{- if and .Values.element.config.branding (or .Values.element.config.branding.authHeaderLogoUrl .Values.element.config.branding.welcomeBackgroundUrl) }},

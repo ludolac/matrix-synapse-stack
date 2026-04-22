@@ -1,0 +1,52 @@
+{{- if .Values.rtc.enabled }}
+# ClusterIP for signaling (WSS) - Ingress terminates TLS and forwards to 7880.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-livekit
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: livekit
+spec:
+  type: ClusterIP
+  ports:
+    - name: signaling
+      port: 7880
+      targetPort: signaling
+      protocol: TCP
+  selector:
+    {{- include "matrix-synapse.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: livekit
+---
+# LoadBalancer for muxed UDP media. A dedicated OVH LB is required here
+# (OVH Managed K8s cannot share one LB across Services of different selectors).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-livekit-udp
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: livekit
+  annotations:
+    {{- if .Values.rtc.livekit.service.externalDns.enabled }}
+    external-dns.alpha.kubernetes.io/hostname: {{ .Values.rtc.livekit.service.externalDns.hostname }}
+    external-dns.alpha.kubernetes.io/ttl: "{{ .Values.rtc.livekit.service.externalDns.ttl }}"
+    {{- end }}
+    {{- with .Values.rtc.livekit.service.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  type: LoadBalancer
+  {{- with .Values.rtc.livekit.service.loadBalancerIP }}
+  loadBalancerIP: {{ . }}
+  {{- end }}
+  externalTrafficPolicy: {{ .Values.rtc.livekit.service.externalTrafficPolicy }}
+  ports:
+    - name: media-udp
+      port: {{ .Values.rtc.livekit.service.udpMuxPort }}
+      targetPort: media-udp
+      protocol: UDP
+  selector:
+    {{- include "matrix-synapse.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: livekit
+{{- end }}

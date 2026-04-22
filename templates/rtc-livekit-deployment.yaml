@@ -1,0 +1,100 @@
+{{- if .Values.rtc.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-livekit
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: livekit
+spec:
+  replicas: {{ .Values.rtc.livekit.replicaCount }}
+  # LiveKit holds long-lived WebRTC sessions; graceful drain needed on upgrade.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "matrix-synapse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: livekit
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/rtc-livekit-configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "matrix-synapse.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: livekit
+    spec:
+      serviceAccountName: {{ include "matrix-synapse.serviceAccountName" . }}
+      # Graceful shutdown: let existing sessions drain before terminating.
+      terminationGracePeriodSeconds: 1800  # 30 min
+      securityContext:
+        {{- toYaml .Values.rtc.livekit.podSecurityContext | nindent 8 }}
+      containers:
+        - name: livekit
+          securityContext:
+            {{- toYaml .Values.rtc.livekit.securityContext | nindent 12 }}
+          image: "{{ .Values.rtc.livekit.image.repository }}:{{ .Values.rtc.livekit.image.tag }}"
+          imagePullPolicy: {{ .Values.rtc.livekit.image.pullPolicy }}
+          args:
+            - --config
+            - /etc/livekit/config.yaml
+          env:
+            {{- if and .Values.rtc.livekit.turn.enabled .Values.rtc.livekit.turn.reuseCoturn .Values.coturn.enabled }}
+            - name: TURN_SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "matrix-synapse.fullname" . }}-turn-credentials
+                  key: shared-secret
+            {{- end }}
+          ports:
+            - name: signaling
+              containerPort: 7880
+              protocol: TCP
+            - name: media-udp
+              containerPort: {{ .Values.rtc.livekit.service.udpMuxPort }}
+              protocol: UDP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: signaling
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: signaling
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.rtc.livekit.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/livekit/config.yaml
+              subPath: config.yaml
+              readOnly: true
+            - name: keys
+              mountPath: /etc/livekit/keys.yaml
+              subPath: keys.yaml
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "matrix-synapse.fullname" . }}-livekit-config
+        - name: keys
+          secret:
+            secretName: {{ .Values.rtc.livekit.existingSecret | default (printf "%s-livekit" (include "matrix-synapse.fullname" .)) }}
+            items:
+              - key: keys.yaml
+                path: keys.yaml
+      {{- with .Values.rtc.livekit.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.rtc.livekit.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.rtc.livekit.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

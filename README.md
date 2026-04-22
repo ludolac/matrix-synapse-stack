@@ -124,9 +124,11 @@ This production-ready Helm chart simplifies the deployment of Matrix Synapse on 
 
 ✅ **Element Web** v1.12.15 - Modern web client with dark theme
 
-✅ **PostgreSQL 16** - Reliable database backend
+✅ **PostgreSQL 17** - Reliable database backend (CloudNativePG HA or standalone)
 
-✅ **Coturn TURN Server** - Integrated WebRTC support for video/voice calls
+✅ **Coturn TURN Server** - Integrated WebRTC support for 1-to-1 video/voice calls
+
+✅ **MatrixRTC / Element Call** *(opt-in)* - Native group video calls via LiveKit SFU + lk-jwt-service (MSC3401 / MSC4143)
 
 ✅ **URL Previews** - Rich link previews with OpenGraph metadata and SSRF protection
 
@@ -1163,6 +1165,102 @@ See full Coturn documentation in original README for advanced configuration.
 
 ---
 
+## MatrixRTC / Element Call (Group Video Calls)
+
+Native Matrix group calls using the LiveKit SFU backend, compliant with
+[MSC3401](https://github.com/matrix-org/matrix-spec-proposals/pull/3401) and
+[MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+Disabled by default. Enable with `rtc.enabled: true`.
+
+### Components deployed
+
+| Component | Image | Port(s) | Purpose |
+|-----------|-------|---------|---------|
+| LiveKit SFU | `livekit/livekit-server:v1.11.0` | TCP 7880 (WSS), UDP 7882 (muxed media) | WebRTC media relay |
+| lk-jwt-service | `ghcr.io/element-hq/lk-jwt-service:v0.4.2` | TCP 8080 | Validates Matrix OpenID tokens, signs LiveKit JWTs |
+| Element Call (SPA) | `ghcr.io/element-hq/element-call:v0.19.1` | TCP 80 | Web app loaded as widget by Element Web |
+
+Synapse is automatically reconfigured with `experimental_features.msc3266_enabled` +
+`msc4140_enabled` (delayed events — required to avoid stuck calls). The `.well-known/matrix/client`
+endpoint advertises `org.matrix.msc4143.rtc_foci` so clients discover the backend.
+
+### Prerequisites
+
+1. **2nd OVH LoadBalancer** (UDP) for the muxed media port — ~5 €/month. A shared LB is
+   not possible with OVH Managed Kubernetes (each `type: LoadBalancer` Service gets its own LB).
+2. **Two DNS records**: `call.<domain>` (Element Call SPA) and `matrix-rtc.<domain>` (backend).
+3. **API key/secret pair**: generate with `openssl rand -hex 32` for both values.
+
+### Minimal configuration
+
+```yaml
+rtc:
+  enabled: true
+  livekit:
+    apiKey: "APIxxxxxxxxxxxxxx"        # openssl rand -hex 32
+    apiSecret: "xxxxxxxxxxxxxxxx..."   # openssl rand -hex 32
+    service:
+      externalDns:
+        enabled: true
+        hostname: "livekit.waadoo.ovh"  # UDP LB endpoint announced to clients
+      annotations:
+        loadbalancer.ovhcloud.com/l4-protocol: udp
+    turn:
+      enabled: true
+      reuseCoturn: true                # share the chart's coturn as TURN fallback
+  ingress:
+    call:
+      host: "call.waadoo.ovh"
+      tls:
+        secretName: "matrix-call-tls"
+    backend:
+      host: "matrix-rtc.waadoo.ovh"
+      tls:
+        secretName: "matrix-rtc-tls"
+```
+
+### Using an existing secret (recommended for production)
+
+```bash
+kubectl create secret generic matrix-livekit-keys -n matrix \
+  --from-literal=LIVEKIT_API_KEY=$(openssl rand -hex 32) \
+  --from-literal=LIVEKIT_API_SECRET=$(openssl rand -hex 32)
+# Then also add a keys.yaml entry (see the existingSecret template for the exact format)
+```
+
+```yaml
+rtc:
+  enabled: true
+  livekit:
+    existingSecret: matrix-livekit-keys
+```
+
+### Troubleshooting
+
+```bash
+# Verify rtc_foci is published in .well-known
+curl https://matrix.waadoo.ovh/.well-known/matrix/client | jq '."org.matrix.msc4143.rtc_foci"'
+
+# Verify jwt-service is reachable
+curl https://matrix-rtc.waadoo.ovh/livekit/jwt/healthz
+
+# LiveKit logs (check for ICE candidate / external IP issues)
+kubectl logs -n matrix -l app.kubernetes.io/component=livekit --tail=100
+
+# jwt-service logs (OpenID validation failures)
+kubectl logs -n matrix -l app.kubernetes.io/component=lk-jwt-service --tail=100
+```
+
+Common issues:
+- **"Cannot connect" in Element Call** → check the UDP LoadBalancer is assigned an IP and
+  the DNS record for `livekit.<domain>` resolves to it.
+- **"Unauthorized" from jwt-service** → `LIVEKIT_FULL_ACCESS_HOMESERVERS` doesn't match the
+  server name, or the OpenID request from the client was rejected by Synapse.
+- **Stuck calls (participants never leave)** → MSC4140 not enabled; verify
+  `experimental_features.msc4140_enabled: true` in the rendered Synapse config.
+
+---
+
 ## User Management
 
 ### Admin User
@@ -1527,11 +1625,15 @@ This Helm chart is licensed under the **MIT License** - see [LICENSE](LICENSE) f
 
 ## Chart Information
 
-- **Chart Version**: 1.7.0
+- **Chart Version**: 1.8.0
 - **Synapse Version**: v1.151.0
 - **Element Web Version**: v1.12.15
 - **PostgreSQL Version**: 17 (`ghcr.io/cloudnative-pg/postgresql:17.9` in CNPG mode, `postgres:17-alpine` in standalone mode)
 - **CloudNativePG**: v1.29+ (required when `postgresql.mode=cnpg`, the default)
 - **Coturn Version**: 4.10-alpine
+- **MatrixRTC (opt-in via `rtc.enabled=true`)**:
+  - LiveKit SFU: `livekit/livekit-server:v1.11.0`
+  - lk-jwt-service: `ghcr.io/element-hq/lk-jwt-service:v0.4.2`
+  - Element Call: `ghcr.io/element-hq/element-call:v0.19.1`
 
 **Maintainer**: WAADOO - contact@waadoo.ovh

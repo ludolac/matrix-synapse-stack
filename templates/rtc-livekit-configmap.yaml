@@ -1,0 +1,62 @@
+{{- if .Values.rtc.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-livekit-config
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: livekit
+data:
+  config.yaml: |
+    # LiveKit SFU configuration.
+    # Signaling on TCP 7880 (behind HTTPS/WSS Traefik ingress).
+    # Media on UDP {{ .Values.rtc.livekit.service.udpMuxPort }} (muxed — single port for all sessions),
+    # exposed by a dedicated UDP LoadBalancer.
+    port: 7880
+    bind_addresses:
+      - "0.0.0.0"
+
+    rtc:
+      # Muxed UDP: all media traffic goes through a single UDP port.
+      # Drastically reduces LB port count vs. a port_range.
+      udp_port: {{ .Values.rtc.livekit.service.udpMuxPort }}
+      # Disable the port range (we rely exclusively on udp_mux).
+      port_range_start: 0
+      port_range_end: 0
+      # Needed when running behind a LoadBalancer: announce the public IP
+      # in ICE candidates so clients can reach the SFU.
+      use_external_ip: true
+      # ICE-Lite: SFU does not act as full ICE agent, simplifies NAT in SFU
+      # deployments where clients initiate the connection.
+      use_ice_lite: true
+      {{- if and .Values.rtc.livekit.turn.enabled .Values.rtc.livekit.turn.reuseCoturn .Values.coturn.enabled }}
+      # TURN fallback via the chart's existing coturn deployment (internal).
+      # Clients behind symmetric NAT will relay through coturn.
+      turn_servers:
+        - host: {{ include "matrix-synapse.fullname" . }}-coturn.{{ .Release.Namespace }}.svc.cluster.local
+          port: 3478
+          protocol: udp
+          credential: "${TURN_SHARED_SECRET}"
+          username: livekit
+      {{- end }}
+
+    # Load keys from mounted secret file (format: "APIkey: secret").
+    # Do not put keys inline in this ConfigMap.
+    key_file: /etc/livekit/keys.yaml
+
+    # Logging
+    logging:
+      level: info
+      json: false
+
+    # Room settings
+    room:
+      auto_create: false           # Let lk-jwt-service authorize room creation
+      enable_remote_unmute: true
+      max_participants: 16         # Element Call default cap
+      empty_timeout: 300           # 5 min after last participant leaves
+
+    # Health / readiness endpoint
+    health:
+      enabled: true
+{{- end }}

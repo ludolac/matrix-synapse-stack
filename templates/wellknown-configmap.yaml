@@ -20,5 +20,12 @@ data:
       },
       "org.matrix.msc3575.proxy": {
         "url": "https://{{ .Values.synapse.server.name }}"
-      }
+      }{{- if .Values.rtc.enabled }},
+      "org.matrix.msc4143.rtc_foci": [
+        {
+          "type": "livekit",
+          "livekit_service_url": "https://{{ .Values.rtc.ingress.backend.host }}/livekit/jwt"
+        }
+      ]
+      {{- end }}
     }

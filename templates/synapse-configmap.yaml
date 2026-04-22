@@ -157,6 +157,18 @@ data:
     # Suppress key server warnings
     suppress_key_server_warning: true
 
+    {{- if .Values.rtc.enabled }}
+    # MatrixRTC (Element Call group calls) prerequisites
+    # MSC3266: room summary API (knocking to join public calls)
+    # MSC4140: delayed events (critical — without it, call leave events are
+    #          lost and stuck calls happen)
+    experimental_features:
+      msc3266_enabled: true
+      msc4140_enabled: true
+    # Maximum lifetime for a delayed event (keep calls from leaking forever)
+    max_event_delay_duration: 24h
+    {{- end }}
+
     {{- if .Values.synapse.server.mfa }}
     # Multi-Factor Authentication (MFA) Configuration
     {{- if .Values.synapse.server.mfa.totp }}

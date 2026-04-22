@@ -1,0 +1,27 @@
+{{- if .Values.rtc.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-element-call-config
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: element-call
+data:
+  # Element Call SPA config. Served at the root of the call.* ingress.
+  # Schema: https://github.com/element-hq/element-call/blob/livekit/config/config.sample.json
+  config.json: |
+    {
+      "default_server_config": {
+        "m.homeserver": {
+          "base_url": "https://{{ .Values.synapse.server.name }}",
+          "server_name": "{{ .Values.synapse.server.name }}"
+        }
+      },
+      "livekit": {
+        "livekit_service_url": "https://{{ .Values.rtc.ingress.backend.host }}/livekit/jwt"
+      },
+      "features": {
+        "feature_use_device_keys_for_e2e": true
+      }
+    }
+{{- end }}

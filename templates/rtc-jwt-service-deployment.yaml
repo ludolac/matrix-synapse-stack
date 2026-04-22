@@ -1,0 +1,73 @@
+{{- if .Values.rtc.enabled }}
+{{- $secretName := .Values.rtc.livekit.existingSecret | default (printf "%s-livekit" (include "matrix-synapse.fullname" .)) -}}
+{{- $fullAccess := .Values.rtc.jwtService.fullAccessHomeservers -}}
+{{- if not $fullAccess -}}
+{{- $fullAccess = list .Values.synapse.server.name -}}
+{{- end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-lk-jwt-service
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: lk-jwt-service
+spec:
+  replicas: {{ .Values.rtc.jwtService.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "matrix-synapse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: lk-jwt-service
+  template:
+    metadata:
+      labels:
+        {{- include "matrix-synapse.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: lk-jwt-service
+    spec:
+      serviceAccountName: {{ include "matrix-synapse.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.rtc.jwtService.podSecurityContext | nindent 8 }}
+      containers:
+        - name: lk-jwt-service
+          securityContext:
+            {{- toYaml .Values.rtc.jwtService.securityContext | nindent 12 }}
+          image: "{{ .Values.rtc.jwtService.image.repository }}:{{ .Values.rtc.jwtService.image.tag }}"
+          imagePullPolicy: {{ .Values.rtc.jwtService.image.pullPolicy }}
+          env:
+            - name: LIVEKIT_URL
+              # Internal signaling URL (Traefik ingress is not needed for
+              # intra-cluster comms; keep path clean for routing).
+              value: "ws://{{ include "matrix-synapse.fullname" . }}-livekit.{{ .Release.Namespace }}.svc.cluster.local:7880"
+            - name: LIVEKIT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: LIVEKIT_API_KEY
+            - name: LIVEKIT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: LIVEKIT_API_SECRET
+            - name: LIVEKIT_FULL_ACCESS_HOMESERVERS
+              # Comma-separated list of homeservers allowed to auto-create rooms.
+              value: {{ join "," $fullAccess | quote }}
+            - name: LK_JWT_PORT
+              value: "8080"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.rtc.jwtService.resources | nindent 12 }}
+{{- end }}

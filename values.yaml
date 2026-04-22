@@ -818,3 +818,190 @@ coturn:
     # # Custom configuration
     # cli-password=mypassword
 
+# ==============================================================================
+# MatrixRTC / Element Call (group video calls)
+# ==============================================================================
+# Deploys the LiveKit SFU + lk-jwt-service + Element Call SPA required for
+# group video/voice calls (MSC3401 + MSC4143 + MSC4195).
+#
+# Architecture:
+#   - LiveKit SFU: media server (WebRTC), exposed via HTTPS (WSS) for
+#     signaling and via a dedicated UDP LoadBalancer for media (muxed).
+#   - lk-jwt-service: authorization service, validates Matrix OpenID tokens
+#     and issues short-lived LiveKit JWTs.
+#   - Element Call (SPA): web app loaded as widget/iframe by Element Web or
+#     ElementX, opened at rtc.ingress.call.host.
+#   - Synapse is automatically configured with experimental_features
+#     msc3266_enabled + msc4140_enabled (delayed events) when rtc.enabled=true.
+#   - The well-known server advertises org.matrix.msc4143.rtc_foci so clients
+#     can discover the backend.
+#
+# Prerequisites:
+#   - A second OVH LoadBalancer for the muxed UDP port (cost: ~5€/month).
+#   - DNS records: call.<domain> and matrix-rtc.<domain>.
+rtc:
+  enabled: false
+
+  # LiveKit SFU (https://livekit.io/)
+  livekit:
+    image:
+      repository: livekit/livekit-server
+      tag: "v1.11.0"
+      pullPolicy: IfNotPresent
+    replicaCount: 1
+
+    # Shared API key / secret with lk-jwt-service.
+    # Generate with: openssl rand -hex 32
+    # If both are empty, a Secret must be created out-of-band with keys
+    # LIVEKIT_API_KEY and LIVEKIT_API_SECRET (see rtc.livekit.existingSecret).
+    apiKey: ""
+    apiSecret: ""
+    existingSecret: ""  # Optional: name of pre-existing secret
+
+    # UDP LoadBalancer for WebRTC media (muxed mode = single UDP port for
+    # all sessions via SCTP/DTLS). Much cheaper than a port range.
+    service:
+      # Muxed UDP port advertised to clients for all media traffic.
+      udpMuxPort: 7882
+      # OVH-specific: annotations for the UDP LoadBalancer.
+      annotations: {}
+        # loadbalancer.ovhcloud.com/l4-protocol: udp
+      loadBalancerIP: ""
+      externalTrafficPolicy: Cluster  # Local preserves client IP but needs DSR support
+      # external-dns hostname for the UDP endpoint.
+      externalDns:
+        enabled: false
+        hostname: ""  # e.g., livekit.waadoo.ovh
+        ttl: 300
+
+    # TURN fallback (for clients behind symmetric NAT).
+    # Can reuse the chart's existing coturn deployment.
+    turn:
+      enabled: false
+      # If reuseCoturn=true, LiveKit is configured to use the chart's coturn
+      # (internal service DNS). Shared secret is pulled from the coturn
+      # credentials secret.
+      reuseCoturn: true
+
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 1000
+
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+
+  # lk-jwt-service (https://github.com/element-hq/lk-jwt-service)
+  # Minimal service issuing LiveKit JWTs based on Matrix OpenID tokens.
+  jwtService:
+    image:
+      repository: ghcr.io/element-hq/lk-jwt-service
+      tag: "v0.4.2"
+      pullPolicy: IfNotPresent
+    replicaCount: 1
+
+    # Homeservers whose users get full-access (can auto-create LiveKit rooms).
+    # Your own homeserver must be listed here.
+    # Empty = auto-populated from synapse.server.name.
+    fullAccessHomeservers: []
+
+    resources:
+      limits:
+        cpu: 500m
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 10001
+      runAsGroup: 10001
+      fsGroup: 10001
+      seccompProfile:
+        type: RuntimeDefault
+
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 10001
+
+  # Element Call SPA (https://github.com/element-hq/element-call)
+  # Web client served at rtc.ingress.call.host (e.g., call.waadoo.ovh).
+  elementCall:
+    image:
+      repository: ghcr.io/element-hq/element-call
+      tag: "v0.19.1"
+      pullPolicy: IfNotPresent
+    replicaCount: 1
+
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 101
+      fsGroup: 101
+      seccompProfile:
+        type: RuntimeDefault
+
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 101
+
+  # HTTPS Ingress for the Element Call SPA and the MatrixRTC backend (jwt + sfu).
+  ingress:
+    className: "traefik"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+      traefik.ingress.kubernetes.io/router.tls: "true"
+
+    # Element Call SPA (the web app loaded in an iframe by Element Web).
+    call:
+      host: "call.example.com"
+      tls:
+        secretName: "matrix-rtc-call-tls"
+
+    # MatrixRTC backend: path routing over a single host.
+    #   /livekit/jwt/* -> lk-jwt-service
+    #   /livekit/sfu/* -> LiveKit WebSocket (signaling)
+    backend:
+      host: "matrix-rtc.example.com"
+      tls:
+        secretName: "matrix-rtc-backend-tls"

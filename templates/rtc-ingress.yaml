@@ -1,0 +1,70 @@
+{{- if .Values.rtc.enabled }}
+# Element Call SPA: https://call.<domain>
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-element-call
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: element-call
+  annotations:
+    {{- with .Values.rtc.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.rtc.ingress.className }}
+  tls:
+    - hosts:
+        - {{ .Values.rtc.ingress.call.host }}
+      secretName: {{ .Values.rtc.ingress.call.tls.secretName }}
+  rules:
+    - host: {{ .Values.rtc.ingress.call.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "matrix-synapse.fullname" . }}-element-call
+                port:
+                  number: 80
+---
+# MatrixRTC backend: https://matrix-rtc.<domain>
+#   /livekit/jwt/  -> lk-jwt-service (authorization + JWT issuance)
+#   /livekit/sfu/  -> LiveKit signaling (WebSocket upgrade)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-rtc-backend
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rtc-backend
+  annotations:
+    {{- with .Values.rtc.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.rtc.ingress.className }}
+  tls:
+    - hosts:
+        - {{ .Values.rtc.ingress.backend.host }}
+      secretName: {{ .Values.rtc.ingress.backend.tls.secretName }}
+  rules:
+    - host: {{ .Values.rtc.ingress.backend.host }}
+      http:
+        paths:
+          - path: /livekit/jwt
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "matrix-synapse.fullname" . }}-lk-jwt-service
+                port:
+                  number: 8080
+          - path: /livekit/sfu
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "matrix-synapse.fullname" . }}-livekit
+                port:
+                  number: 7880
+{{- end }}

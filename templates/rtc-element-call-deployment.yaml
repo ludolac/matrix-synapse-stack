@@ -1,0 +1,72 @@
+{{- if .Values.rtc.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-element-call
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: element-call
+spec:
+  replicas: {{ .Values.rtc.elementCall.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "matrix-synapse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: element-call
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/rtc-element-call-configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "matrix-synapse.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: element-call
+    spec:
+      serviceAccountName: {{ include "matrix-synapse.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.rtc.elementCall.podSecurityContext | nindent 8 }}
+      containers:
+        - name: element-call
+          securityContext:
+            {{- toYaml .Values.rtc.elementCall.securityContext | nindent 12 }}
+          image: "{{ .Values.rtc.elementCall.image.repository }}:{{ .Values.rtc.elementCall.image.tag }}"
+          imagePullPolicy: {{ .Values.rtc.elementCall.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.rtc.elementCall.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.json
+              subPath: config.json
+              readOnly: true
+            # Nginx in the official image needs tmp dirs writable.
+            - name: tmp
+              mountPath: /tmp
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "matrix-synapse.fullname" . }}-element-call-config
+        - name: tmp
+          emptyDir: {}
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}
+{{- end }}
