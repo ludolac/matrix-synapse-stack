@@ -1,0 +1,30 @@
+{{- if .Values.mas.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-mas
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mas
+  annotations:
+    {{- with .Values.mas.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.mas.ingress.className }}
+  tls:
+    - hosts:
+        - {{ .Values.mas.ingress.host }}
+      secretName: {{ .Values.mas.ingress.tls.secretName }}
+  rules:
+    - host: {{ .Values.mas.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "matrix-synapse.fullname" . }}-mas
+                port:
+                  number: 8080
+{{- end }}

@@ -1,0 +1,102 @@
+{{- if .Values.mas.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-mas
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mas
+spec:
+  replicas: {{ .Values.mas.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "matrix-synapse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: mas
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/mas-configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "matrix-synapse.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mas
+    spec:
+      serviceAccountName: {{ include "matrix-synapse.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.mas.podSecurityContext | nindent 8 }}
+      # Run DB migrations before the main container starts. Idempotent.
+      initContainers:
+        - name: db-migrate
+          image: "{{ .Values.mas.image.repository }}:{{ .Values.mas.image.tag }}"
+          imagePullPolicy: {{ .Values.mas.image.pullPolicy }}
+          args:
+            - database
+            - migrate
+            - --config
+            - /etc/mas/config.yaml
+          env:
+            {{- include "matrix-synapse.mas.envSecrets" . | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/mas
+              readOnly: true
+          securityContext:
+            {{- toYaml .Values.mas.securityContext | nindent 12 }}
+      containers:
+        - name: mas
+          securityContext:
+            {{- toYaml .Values.mas.securityContext | nindent 12 }}
+          image: "{{ .Values.mas.image.repository }}:{{ .Values.mas.image.tag }}"
+          imagePullPolicy: {{ .Values.mas.image.pullPolicy }}
+          args:
+            - server
+            - --config
+            - /etc/mas/config.yaml
+          env:
+            {{- include "matrix-synapse.mas.envSecrets" . | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.mas.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/mas
+              readOnly: true
+            # MAS writes a handful of transient files at startup; tmpfs is fine.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "matrix-synapse.fullname" . }}-mas-config
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.mas.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.mas.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.mas.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

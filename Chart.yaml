@@ -1,8 +1,8 @@
 apiVersion: v2
 name: matrix-synapse
-description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn TURN server on Kubernetes
+description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element Call, Coturn, CloudNativePG) on Kubernetes
 type: application
-version: 1.8.3
+version: 2.0.0
 appVersion: "1.151.0"
 keywords:
   - matrix
@@ -18,6 +18,10 @@ keywords:
   - matrixrtc
   - livekit
   - element-call
+  - mas
+  - matrix-authentication-service
+  - msc3861
+  - oidc
   - cnpg
   - cloudnative-pg
 home: https://matrix.org
@@ -27,6 +31,7 @@ sources:
   - https://github.com/element-hq/element-web
   - https://github.com/element-hq/element-call
   - https://github.com/element-hq/lk-jwt-service
+  - https://github.com/element-hq/matrix-authentication-service
   - https://github.com/livekit/livekit
   - https://github.com/coturn/coturn
   - https://github.com/cloudnative-pg/cloudnative-pg
@@ -38,4 +43,21 @@ annotations:
   # installed cluster-wide BEFORE deploying this chart.
   # https://cloudnative-pg.io/documentation/current/installation_upgrade/
   artifacthub.io/prerequisites: |
-    - CloudNativePG operator (required when postgresql.mode=cnpg, the default)
+    - CloudNativePG operator v1.25+ (required when postgresql.mode=cnpg, the default)
+    - Traefik v3.x (for RTC and MAS Ingresses if those features are enabled)
+  # BREAKING CHANGES in 2.0.0:
+  # - Introduces mas.enabled for MSC3861 delegated auth via Matrix Authentication Service.
+  # - When mas.enabled=true, the legacy Synapse OIDC/password/registration_shared_secret
+  #   blocks are removed (they conflict with MSC3861). Admin creation moves to
+  #   mas-cli. No in-place migration is provided — wipe + redeploy is expected.
+  artifacthub.io/changes: |
+    - kind: added
+      description: "Matrix Authentication Service (MAS) integration via mas.enabled (MSC3861, QR login, ElementX compatible)"
+    - kind: added
+      description: "CNPG Database CRD to provision mas_prod in the existing Synapse cluster"
+    - kind: added
+      description: "scripts/generate-mas-secrets.sh to bootstrap MAS cryptographic material"
+    - kind: changed
+      description: "When mas.enabled=true, Synapse's legacy oidc_providers/password_config/registration_shared_secret are omitted"
+    - kind: changed
+      description: "Chart bumped to 2.0.0 (breaking) due to the auth model change"

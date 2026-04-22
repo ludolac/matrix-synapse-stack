@@ -1,0 +1,27 @@
+{{- if and .Values.mas.enabled (eq .Values.mas.database.mode "cnpg") }}
+{{- if ne (.Values.postgresql.mode | default "cnpg") "cnpg" -}}
+{{- fail "mas.database.mode=cnpg requires postgresql.mode=cnpg (the chart-managed Cluster). Set mas.database.mode=external to bring your own DB." -}}
+{{- end }}
+# Declarative database creation via CNPG 1.25+ Database CRD.
+# The operator creates mas_prod inside the existing Synapse Cluster with the
+# locale/encoding settings required by Matrix software.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: {{ printf "%s-mas" (include "matrix-synapse.postgresql.cnpgClusterName" .) }}
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mas
+spec:
+  cluster:
+    name: {{ include "matrix-synapse.postgresql.cnpgClusterName" . }}
+  name: {{ .Values.mas.database.name }}
+  # Reuse the Synapse role as owner (dev-friendly). For production isolation,
+  # add a dedicated role via the Cluster's managed.roles and override this.
+  owner: {{ .Values.postgresql.username }}
+  encoding: UTF8
+  locale_collate: C
+  locale_c_type: C
+  # Do not drop the DB when this CR is deleted (extra safety on chart uninstall).
+  reclaim_policy: retain
+{{- end }}

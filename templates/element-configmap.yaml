@@ -47,6 +47,8 @@ data:
         "feature_group_calls": "enable",
         "feature_video_rooms": "enable",
         "feature_element_call_video_rooms": "enable"
+        {{- end }}{{- if .Values.mas.enabled }},
+        "feature_oidc_native_flow": "enable"
         {{- end }}
       },
       {{- if .Values.rtc.enabled }}

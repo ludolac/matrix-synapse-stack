@@ -294,17 +294,11 @@ synapse:
     timeoutSeconds: 3
     failureThreshold: 3
 
-  # Matrix Authentication Service (MAS) Integration
-  # See MAS-INTEGRATION-GUIDE.md for full implementation details
-  # This is disabled by default - enable when ready to implement MAS
-  mas:
-    enabled: false
-    # When enabled, Synapse will delegate authentication to MAS
-    # Requires MAS to be deployed separately (templates not yet included)
-    issuer: ""  # e.g., "https://auth.waadoo.ovh/"
-    accountManagementUrl: ""  # e.g., "https://auth.waadoo.ovh/account"
-    clientId: "synapse"
-    clientSecret: ""  # From Kubernetes secret
+  # Note: Matrix Authentication Service (MAS) integration is now a top-level
+  # section `mas:` at the bottom of this file. When `mas.enabled=true`, Synapse
+  # is automatically configured with MSC3861 delegated auth and the legacy
+  # password_config / oidc_providers / registration_shared_secret blocks are
+  # removed (they conflict with MSC3861).
 
   startupProbe:
     httpGet:
@@ -817,6 +811,123 @@ coturn:
     # |
     # # Custom configuration
     # cli-password=mypassword
+
+# ==============================================================================
+# Matrix Authentication Service (MAS)
+# ==============================================================================
+# Deploys MAS as the authentication/authorization backend for Synapse.
+# When enabled, Synapse delegates auth via MSC3861 (OAuth2) and the legacy
+# password/OIDC/registration_shared_secret paths are removed from the Synapse
+# config (they are incompatible with MSC3861).
+#
+# Prerequisites:
+#   - CNPG operator (CRD `Database` from CNPG 1.25+) — the chart provisions a
+#     dedicated DB `mas_prod` in the existing postgresql.cnpg cluster.
+#   - An upstream OIDC IdP (e.g. Authelia) — used by MAS to authenticate users.
+#   - DNS record: auth.<domain>
+#
+# Bootstrap flow (no legacy migration — wipe + redeploy):
+#   1. Generate cryptographic material: scripts/generate-mas-secrets.sh
+#   2. Create Kubernetes secret referenced by mas.existingSecret
+#   3. Deploy the chart with mas.enabled=true
+#   4. User logs in once via Authelia (creates MAS account linked to OIDC)
+#   5. Promote to admin: kubectl exec deploy/<release>-mas -- mas-cli manage \
+#        set-admin <localpart> --admin
+#
+# See README section "Matrix Authentication Service (MAS)" for details.
+mas:
+  enabled: false
+
+  image:
+    repository: ghcr.io/element-hq/matrix-authentication-service
+    tag: "1.15.0"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  # Public URL of MAS — advertised via .well-known and used by Synapse as the
+  # OAuth2 issuer. Must match the Ingress host.
+  publicUrl: "https://auth.example.com/"
+
+  # Database. MAS requires its own PostgreSQL database (not shared with Synapse).
+  # When postgresql.mode=cnpg, the chart can provision a dedicated DB via the
+  # CNPG `Database` CRD inside the existing cluster.
+  database:
+    # cnpg: use the chart's existing CNPG cluster and provision mas_prod there
+    # external: use an external PostgreSQL, credentials via existingSecret
+    mode: cnpg
+
+    # Name of the database and owner role (when mode=cnpg)
+    name: mas_prod
+    username: mas
+
+    # When mode=external: point to an existing secret with keys
+    # DATABASE_HOST, DATABASE_PORT, DATABASE_NAME, DATABASE_USERNAME,
+    # DATABASE_PASSWORD.
+    external:
+      existingSecret: ""
+
+  # Upstream OIDC provider(s) — MAS delegates authentication to these.
+  # At least one provider is required. Leave the list empty to disable MAS.
+  upstreamOauth2:
+    providers: []
+      # Example for Authelia:
+      # - id: authelia
+      #   issuer: "https://authelia.example.com"
+      #   clientId: "matrix"          # reuse existing Authelia OIDC client
+      #   # Secret key name inside mas.existingSecret holding the client secret:
+      #   clientSecretKey: "AUTHELIA_CLIENT_SECRET"
+      #   scope: "openid profile email"
+      #   claimsImports:
+      #     localpart: "{{ user.preferred_username }}"
+      #     displayname: "{{ user.name }}"
+      #     email: "{{ user.email }}"
+
+  # Secrets for MAS (encryption key, signing keys, Synapse shared secret,
+  # admin token). Generate with scripts/generate-mas-secrets.sh and reference
+  # the resulting Secret here. The chart will NOT auto-generate these (RSA
+  # keys cannot be safely generated from Helm templates).
+  existingSecret: ""  # e.g., "matrix-synapse-mas-secrets"
+
+  # Ingress (HTTPS UI + OAuth endpoints). MAS listens on 8080 internally.
+  ingress:
+    className: "traefik"
+    host: "auth.example.com"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+      traefik.ingress.kubernetes.io/router.tls: "true"
+    tls:
+      secretName: "matrix-mas-tls"
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 10001
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
 
 # ==============================================================================
 # MatrixRTC / Element Call (group video calls)

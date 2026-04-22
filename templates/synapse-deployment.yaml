@@ -55,7 +55,9 @@ spec:
                 sed "s|\${POSTGRES_PASSWORD}|${POSTGRES_PASSWORD}|g" | \
                 sed "s|\${REGISTRATION_SHARED_SECRET}|${REGISTRATION_SHARED_SECRET}|g" | \
                 sed "s|\${AUTHELIA_CLIENT_SECRET}|${AUTHELIA_CLIENT_SECRET}|g" | \
-                sed "s|\${TURN_SHARED_SECRET}|${TURN_SHARED_SECRET}|g" > /data/homeserver-override.yaml
+                sed "s|\${TURN_SHARED_SECRET}|${TURN_SHARED_SECRET}|g" | \
+                sed "s|\${SYNAPSE_MAS_CLIENT_SECRET}|${SYNAPSE_MAS_CLIENT_SECRET}|g" | \
+                sed "s|\${SYNAPSE_MAS_SHARED_SECRET}|${SYNAPSE_MAS_SHARED_SECRET}|g" > /data/homeserver-override.yaml
 
               echo "Configuration ready"
           env:
@@ -64,14 +66,14 @@ spec:
                 secretKeyRef:
                   name: {{ include "matrix-synapse.postgresql.secretName" . }}
                   key: {{ include "matrix-synapse.postgresql.secretPasswordKey" . }}
-            {{- if .Values.synapse.server.adminUser.enabled }}
+            {{- if and .Values.synapse.server.adminUser.enabled (not .Values.mas.enabled) }}
             - name: REGISTRATION_SHARED_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ include "matrix-synapse.fullname" . }}-admin-credentials
                   key: registration-secret
             {{- end }}
-            {{- if .Values.synapse.server.sso.enabled }}
+            {{- if and .Values.synapse.server.sso.enabled (not .Values.mas.enabled) }}
             {{- if .Values.synapse.server.sso.oidc.enabled }}
             - name: AUTHELIA_CLIENT_SECRET
               valueFrom:
@@ -86,6 +88,19 @@ spec:
                 secretKeyRef:
                   name: {{ include "matrix-synapse.fullname" . }}-turn-credentials
                   key: shared-secret
+            {{- end }}
+            {{- if .Values.mas.enabled }}
+            # MSC3861 secrets for delegated auth (injected into homeserver-override.yaml)
+            - name: SYNAPSE_MAS_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "mas.existingSecret is required when mas.enabled=true" .Values.mas.existingSecret }}
+                  key: SYNAPSE_CLIENT_SECRET
+            - name: SYNAPSE_MAS_SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mas.existingSecret }}
+                  key: SYNAPSE_SHARED_SECRET
             {{- end }}
           volumeMounts:
             - name: synapse-config
@@ -139,14 +154,14 @@ spec:
                 secretKeyRef:
                   name: {{ include "matrix-synapse.postgresql.secretName" . }}
                   key: {{ include "matrix-synapse.postgresql.secretPasswordKey" . }}
-            {{- if .Values.synapse.server.adminUser.enabled }}
+            {{- if and .Values.synapse.server.adminUser.enabled (not .Values.mas.enabled) }}
             - name: REGISTRATION_SHARED_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ include "matrix-synapse.fullname" . }}-admin-credentials
                   key: registration-secret
             {{- end }}
-            {{- if .Values.synapse.server.sso.enabled }}
+            {{- if and .Values.synapse.server.sso.enabled (not .Values.mas.enabled) }}
             {{- if .Values.synapse.server.sso.oidc.enabled }}
             - name: AUTHELIA_CLIENT_SECRET
               valueFrom:
