@@ -996,12 +996,16 @@ mas:
   affinity: {}
 
 # ==============================================================================
-# Synapse-Admin (web UI for Matrix admin operations)
+# Ketesa (web UI for Matrix admin operations, formerly known as synapse-admin)
 # ==============================================================================
-# etkecc/synapse-admin (ex-Ketesa) is a React SPA that exposes the Synapse
-# Admin API behind a convenient web UI (user listing, deactivation, room
-# management, media quarantine, server stats). Complementary to MAS — MAS
-# handles authentication, synapse-admin handles administration.
+# Ketesa is a React SPA that exposes the Synapse Admin API (and the MAS admin
+# API when deployed together) behind a convenient web UI: user listing,
+# deactivation, room management, media quarantine, server stats, and
+# **registration token administration** (both Synapse and MAS tokens).
+#
+# The project was renamed from "etkecc/synapse-admin" to "etkecc/ketesa" —
+# same codebase. The Helm values key stays `synapseAdmin` to avoid breaking
+# existing deployments.
 #
 # Scope:
 #   - Does NOT replace MAS — you still need MAS (or legacy OIDC) to log in.
@@ -1012,7 +1016,9 @@ synapseAdmin:
   enabled: false
 
   image:
-    repository: ghcr.io/etkecc/synapse-admin
+    # New canonical image path (project rename — see upstream:
+    # https://github.com/etkecc/ketesa).
+    repository: ghcr.io/etkecc/ketesa
     tag: "v1.2.0"
     pullPolicy: IfNotPresent
 
