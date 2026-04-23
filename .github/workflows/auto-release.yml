@@ -7,6 +7,9 @@ on:
     paths-ignore:
       - 'Chart.yaml'
       - '.github/workflows/auto-release.yml'
+  # Allow manual re-trigger in case of CI race (concurrent README update
+  # from Trivy collides with the auto-bump push -> non-fast-forward).
+  workflow_dispatch:
 
 jobs:
   auto-release:
@@ -62,7 +65,17 @@ jobs:
           NEW_VERSION="${{ steps.bump_version.outputs.new_version }}"
           git add Chart.yaml
           git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
-          git push origin main
+          # Rebase-then-push retry in case main moved during the workflow run
+          # (e.g. concurrent Trivy scan pushing README, or a rapid 2nd user
+          # push). Without this, non-fast-forward rejections leave the chart
+          # stuck at the previous version.
+          for attempt in 1 2 3 4 5; do
+            if git push origin main; then
+              break
+            fi
+            echo "push rejected (attempt $attempt/5), pulling with rebase..."
+            git pull --rebase origin main
+          done
 
       - name: Create and push tag
         run: |
