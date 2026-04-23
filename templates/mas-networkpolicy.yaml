@@ -88,4 +88,14 @@ spec:
     - ports:
         - protocol: TCP
           port: 443
+    {{- if .Values.mas.email.hostname }}
+    # MAS → SMTP server (email verification for password registration and
+    # password reset). Mirrors the pattern used by Synapse's NetworkPolicy
+    # for `synapse.server.email.enabled`.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.mas.email.port | default 587 }}
+    {{- end }}
 {{- end }}
