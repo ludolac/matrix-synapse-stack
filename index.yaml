@@ -18,7 +18,67 @@ entries:
         - Traefik v3.x (for RTC and MAS Ingresses if those features are enabled)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.408282151Z"
+    created: "2026-04-23T08:34:28.921372876Z"
+    description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element
+      Call, Coturn, CloudNativePG) on Kubernetes
+    digest: 62f737fcee2274f161d85c932654036999059792bced745bdc7e06b9b80879e5
+    home: https://matrix.org
+    icon: https://matrix.org/images/matrix-logo.svg
+    keywords:
+    - matrix
+    - synapse
+    - element
+    - coturn
+    - turn
+    - webrtc
+    - chat
+    - messaging
+    - video-calls
+    - group-calls
+    - matrixrtc
+    - livekit
+    - element-call
+    - mas
+    - matrix-authentication-service
+    - msc3861
+    - oidc
+    - cnpg
+    - cloudnative-pg
+    maintainers:
+    - email: contact@waadoo.ovh
+      name: WAADOO
+    name: matrix-synapse
+    sources:
+    - https://github.com/element-hq/synapse
+    - https://github.com/element-hq/element-web
+    - https://github.com/element-hq/element-call
+    - https://github.com/element-hq/lk-jwt-service
+    - https://github.com/element-hq/matrix-authentication-service
+    - https://github.com/livekit/livekit
+    - https://github.com/coturn/coturn
+    - https://github.com/cloudnative-pg/cloudnative-pg
+    type: application
+    urls:
+    - https://ludolac.github.io/matrix-synapse-stack/matrix-synapse-2.0.15.tgz
+    version: 2.0.15
+  - annotations:
+      artifacthub.io/changes: |
+        - kind: added
+          description: "Matrix Authentication Service (MAS) integration via mas.enabled (MSC3861, QR login, ElementX compatible)"
+        - kind: added
+          description: "CNPG Database CRD to provision mas_prod in the existing Synapse cluster"
+        - kind: added
+          description: "scripts/generate-mas-secrets.sh to bootstrap MAS cryptographic material"
+        - kind: changed
+          description: "When mas.enabled=true, Synapse's legacy oidc_providers/password_config/registration_shared_secret are omitted"
+        - kind: changed
+          description: "Chart bumped to 2.0.0 (breaking) due to the auth model change"
+      artifacthub.io/prerequisites: |
+        - CloudNativePG operator v1.25+ (required when postgresql.mode=cnpg, the default)
+        - Traefik v3.x (for RTC and MAS Ingresses if those features are enabled)
+    apiVersion: v2
+    appVersion: 1.151.0
+    created: "2026-04-23T08:34:28.918022146Z"
     description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element
       Call, Coturn, CloudNativePG) on Kubernetes
     digest: 6898575ae2e77821fac19526de7da4b59186d0982033d9704f4761983789b49d
@@ -78,7 +138,7 @@ entries:
         - Traefik v3.x (for RTC and MAS Ingresses if those features are enabled)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.405588503Z"
+    created: "2026-04-23T08:34:28.913935471Z"
     description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element
       Call, Coturn, CloudNativePG) on Kubernetes
     digest: 9919609db775e11fb71be3ec7597c42d31868128599aadf97e2018ee331b9320
@@ -138,7 +198,7 @@ entries:
         - Traefik v3.x (for RTC and MAS Ingresses if those features are enabled)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.402643169Z"
+    created: "2026-04-23T08:34:28.910376222Z"
     description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element
       Call, Coturn, CloudNativePG) on Kubernetes
     digest: 9763cf183da121758e965bc44a0d4693e50b48627bc5badf74f1385a570b534f
@@ -198,7 +258,7 @@ entries:
         - Traefik v3.x (for RTC and MAS Ingresses if those features are enabled)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.400108758Z"
+    created: "2026-04-23T08:34:28.90712658Z"
     description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element
       Call, Coturn, CloudNativePG) on Kubernetes
     digest: 3abebf324e8e5d8270737758d1bb21ef6631cea70fe5427ca2e9a88aeef68a26
@@ -258,7 +318,7 @@ entries:
         - Traefik v3.x (for RTC and MAS Ingresses if those features are enabled)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.397552067Z"
+    created: "2026-04-23T08:34:28.903023879Z"
     description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element
       Call, Coturn, CloudNativePG) on Kubernetes
     digest: 117c637cae10ba7ddac15c59eeddb6573a3001c0e77ec9323e835d674feeefe2
@@ -318,7 +378,7 @@ entries:
         - Traefik v3.x (for RTC and MAS Ingresses if those features are enabled)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.430994887Z"
+    created: "2026-04-23T08:34:28.949825024Z"
     description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element
       Call, Coturn, CloudNativePG) on Kubernetes
     digest: af67f420676fed6876709c8a3e1cd039d4cd5e820095fb7e593800515b71620d
@@ -378,7 +438,7 @@ entries:
         - Traefik v3.x (for RTC and MAS Ingresses if those features are enabled)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.428424035Z"
+    created: "2026-04-23T08:34:28.945898275Z"
     description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element
       Call, Coturn, CloudNativePG) on Kubernetes
     digest: 04e2998fdd865f66d49079c40ae1a4191071b83bc783516d657bc18640add90d
@@ -438,7 +498,7 @@ entries:
         - Traefik v3.x (for RTC and MAS Ingresses if those features are enabled)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.425438175Z"
+    created: "2026-04-23T08:34:28.942730056Z"
     description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element
       Call, Coturn, CloudNativePG) on Kubernetes
     digest: 61c088683ac26fafe0a887ebd1d4acb440e28f3920303e410108f14d1c9b4669
@@ -498,7 +558,7 @@ entries:
         - Traefik v3.x (for RTC and MAS Ingresses if those features are enabled)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.422896688Z"
+    created: "2026-04-23T08:34:28.939511052Z"
     description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element
       Call, Coturn, CloudNativePG) on Kubernetes
     digest: 7242db304b0960f8991f3ead6b22af28b1b573bc5f35c2a43f14869e9b4e624c
@@ -558,7 +618,7 @@ entries:
         - Traefik v3.x (for RTC and MAS Ingresses if those features are enabled)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.420306298Z"
+    created: "2026-04-23T08:34:28.935647688Z"
     description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element
       Call, Coturn, CloudNativePG) on Kubernetes
     digest: b134b7a0e91f7fbd91b43fb67e254dbd04e0534c26b7e9b2dadd55cedee93435
@@ -618,7 +678,7 @@ entries:
         - Traefik v3.x (for RTC and MAS Ingresses if those features are enabled)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.417081984Z"
+    created: "2026-04-23T08:34:28.932463449Z"
     description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element
       Call, Coturn, CloudNativePG) on Kubernetes
     digest: 1d932bdb14661215022637a3ad6acc4328b9808db535f017cf4b6fe470b6139e
@@ -678,7 +738,7 @@ entries:
         - Traefik v3.x (for RTC and MAS Ingresses if those features are enabled)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.414551737Z"
+    created: "2026-04-23T08:34:28.928398885Z"
     description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element
       Call, Coturn, CloudNativePG) on Kubernetes
     digest: de899a4e495881639db6cafb5ec8dad233bb7f3f297b504f3b04c2b46b3a8ddd
@@ -738,7 +798,7 @@ entries:
         - Traefik v3.x (for RTC and MAS Ingresses if those features are enabled)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.412012231Z"
+    created: "2026-04-23T08:34:28.925203445Z"
     description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element
       Call, Coturn, CloudNativePG) on Kubernetes
     digest: 321a88253a6d627fbe455a3445296b0ffc7169d126b4397f6492ac38a74bc78f
@@ -798,7 +858,7 @@ entries:
         - Traefik v3.x (for RTC and MAS Ingresses if those features are enabled)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.394469435Z"
+    created: "2026-04-23T08:34:28.899806628Z"
     description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element
       Call, Coturn, CloudNativePG) on Kubernetes
     digest: 575eedba77f5509df3c63a1ca5556971c348d42d242a26624d7ea4cd8a84a602
@@ -846,7 +906,7 @@ entries:
         - CloudNativePG operator (required when postgresql.mode=cnpg, the default)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.392018445Z"
+    created: "2026-04-23T08:34:28.895876466Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: d3aa33bcfa71aa78d7e3c925c4b58f6e1dfbbc0b2c0f23a77f237d04fdea8133
@@ -889,7 +949,7 @@ entries:
         - CloudNativePG operator (required when postgresql.mode=cnpg, the default)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.389767809Z"
+    created: "2026-04-23T08:34:28.89304715Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: d39761eeacafa446716fcdd98c830971f956917c96315ba7a7cb210a356e2509
@@ -932,7 +992,7 @@ entries:
         - CloudNativePG operator (required when postgresql.mode=cnpg, the default)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.387005271Z"
+    created: "2026-04-23T08:34:28.889603874Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: 7047339c8c2108f94f1a01d98d87a2410bbdd68c5db4ee6dd3d13e70370275e5
@@ -975,7 +1035,7 @@ entries:
         - CloudNativePG operator (required when postgresql.mode=cnpg, the default)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.384806969Z"
+    created: "2026-04-23T08:34:28.886769008Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: 6b114d7557b76d3fa93b36e82d47b91905d179ec43b9e15d24fec03fecb3ed00
@@ -1011,7 +1071,7 @@ entries:
         - CloudNativePG operator (required when postgresql.mode=cnpg, the default)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.382898557Z"
+    created: "2026-04-23T08:34:28.884390314Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: 77df8397cc326ba803bde3cc14b7a462e1b14a89f30b6b21dfbfaa3f54986ff6
@@ -1047,7 +1107,7 @@ entries:
         - CloudNativePG operator (required when postgresql.mode=cnpg, the default)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.380331628Z"
+    created: "2026-04-23T08:34:28.881405861Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: 1e73d1a03c9474fdca81a9b7ef46a44e8cc17fe0fc357c43a044490cb58935bc
@@ -1083,7 +1143,7 @@ entries:
         - CloudNativePG operator (required when postgresql.mode=cnpg, the default)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.378484358Z"
+    created: "2026-04-23T08:34:28.87905531Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: fc6765b7790515ce9aca50cd1a063d8dfad405c721e27bfea2e2c1dac57285c8
@@ -1119,7 +1179,7 @@ entries:
         - CloudNativePG operator (required when postgresql.mode=cnpg, the default)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.376644745Z"
+    created: "2026-04-23T08:34:28.876688378Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: 7c74e793c560fbf9632630e13577e50e7b5037139b9ced08d6b478792a493c4e
@@ -1155,7 +1215,7 @@ entries:
         - CloudNativePG operator (required when postgresql.mode=cnpg, the default)
     apiVersion: v2
     appVersion: 1.151.0
-    created: "2026-04-23T08:32:21.374369447Z"
+    created: "2026-04-23T08:34:28.873680195Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: 6bb7348faf22672904f6d1fae7f97f55a0e89cc3390c42d578247a250251106c
@@ -1191,7 +1251,7 @@ entries:
         - CloudNativePG operator (required when postgresql.mode=cnpg, the default)
     apiVersion: v2
     appVersion: 1.140.0
-    created: "2026-04-23T08:32:21.372530104Z"
+    created: "2026-04-23T08:34:28.870832565Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: 50190b8ab54e8c1b7e62385a78dc1ea6ba84825c9097614862520212ac015076
@@ -1224,7 +1284,7 @@ entries:
     version: 1.6.1
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2026-04-23T08:32:21.368728973Z"
+    created: "2026-04-23T08:34:28.865651559Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: b51c543d5adbeee7b5e2629e2ef059ff2e42e210f89f615a55faf2841a708b70
@@ -1254,7 +1314,7 @@ entries:
     version: 1.5.19
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2026-04-23T08:32:21.367106887Z"
+    created: "2026-04-23T08:34:28.863558018Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: b04fd0e88e89cd4b7f7a5927aeae249a5bcc5c695dd19ae419c2263f5f877e3f
@@ -1284,7 +1344,7 @@ entries:
     version: 1.5.18
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2026-04-23T08:32:21.365439132Z"
+    created: "2026-04-23T08:34:28.861482239Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: 823517c57c3a87351fd0c15821d807b87994c9388e46dec134134c43736809fb
@@ -1314,7 +1374,7 @@ entries:
     version: 1.5.17
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2026-04-23T08:32:21.363235736Z"
+    created: "2026-04-23T08:34:28.858942044Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: d7b99cb29cc370b40f7ba7c09a476604cd1169a877323819f2c1843e472e2f9c
@@ -1344,7 +1404,7 @@ entries:
     version: 1.5.16
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2026-04-23T08:32:21.361599858Z"
+    created: "2026-04-23T08:34:28.856639713Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: f1252465bc2f7eaacd15fa56d07dc5375acb40914f2f23a354b8ab84810ead6e
@@ -1374,7 +1434,7 @@ entries:
     version: 1.5.15
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2026-04-23T08:32:21.359964741Z"
+    created: "2026-04-23T08:34:28.854600583Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: b821f8ea8e8251bf6d160655bd3e0e6c44341a1b2b5bb86c6b8c9b2f42f22243
@@ -1404,7 +1464,7 @@ entries:
     version: 1.5.14
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2026-04-23T08:32:21.358077217Z"
+    created: "2026-04-23T08:34:28.852507994Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: 223a8b66f1d5b43e8a7c01ca8b30bf297ad4fa76f55f52f866f25877ad7e3fee
@@ -1434,7 +1494,7 @@ entries:
     version: 1.5.13
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2026-04-23T08:32:21.370669263Z"
+    created: "2026-04-23T08:34:28.86825004Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: 60fbbada83529279a833f6e48202fc66e8942228a775b3845aaba05fca9987df
@@ -1464,7 +1524,7 @@ entries:
     version: 1.5.2
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2026-04-23T08:32:21.356261164Z"
+    created: "2026-04-23T08:34:28.849549496Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: bc4fe040d7a9a00c5e68523810182331786aa7cc3489efa07eae06c726de938c
@@ -1494,7 +1554,7 @@ entries:
     version: 1.5.1
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2026-04-23T08:32:21.354785184Z"
+    created: "2026-04-23T08:34:28.847708657Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: 38efe56840291436a4711c0b77646632a9e4e4d9644b97ff335d171937cec851
@@ -1524,7 +1584,7 @@ entries:
     version: 1.4.15
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2026-04-23T08:32:21.352718195Z"
+    created: "2026-04-23T08:34:28.845026686Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: 4e020cd70f625db064f8f27e7295c663ccf700824ff71d72ba499a4f549d1a36
@@ -1554,7 +1614,7 @@ entries:
     version: 1.4.14
   - apiVersion: v2
     appVersion: 1.140.0
-    created: "2026-04-23T08:32:21.35023668Z"
+    created: "2026-04-23T08:34:28.841922477Z"
     description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn
       TURN server on Kubernetes
     digest: b2dec683451cf32ee2c3b08a4d106a9bbabf872e63cda4584f1ace19cb0fc1ef
@@ -1582,4 +1642,4 @@ entries:
     urls:
     - https://ludolac.github.io/matrix-synapse-stack/matrix-synapse-1.4.13.tgz
     version: 1.4.13
-generated: "2026-04-23T08:32:21.348179459Z"
+generated: "2026-04-23T08:34:28.839306881Z"
