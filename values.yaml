@@ -869,6 +869,26 @@ mas:
     # Matrix handle (@alice:example.com). Off by default.
     loginWithEmailAllowed: false
 
+  # Email configuration (SMTP relay).
+  # Without this, MAS logs "An email was supposed to be sent but no email
+  # backend is configured" on every password reset, registration token
+  # delivery, email verification, etc. — users don't receive anything.
+  # Leave `hostname` empty to skip the email block entirely (OIDC-only
+  # deployments without password registration don't need email).
+  #
+  # For password safety: set `password` to "${EMAIL_PASSWORD}" and add
+  # `EMAIL_PASSWORD` to your `mas.existingSecret`. The render-config init
+  # container will substitute it at pod startup (avoids plain-text in etcd).
+  email:
+    from: "Matrix <noreply@example.com>"
+    replyTo: ""                       # optional, defaults to `from`
+    transport: smtp                    # smtp | sendmail | blackhole
+    mode: plain                        # plain | tls | starttls
+    hostname: ""                       # SMTP relay host — empty disables email
+    port: 587
+    username: ""
+    password: ""
+
   image:
     repository: ghcr.io/element-hq/matrix-authentication-service
     tag: "1.15.0"

@@ -110,6 +110,25 @@ data:
       registration_token_required: {{ .Values.mas.account.registrationTokenRequired }}
       login_with_email_allowed: {{ .Values.mas.account.loginWithEmailAllowed }}
 
+    {{- if .Values.mas.email.hostname }}
+    # Only emitted when a relay hostname is configured — otherwise MAS falls
+    # back to its default "no email backend" mode (password reset, registration
+    # tokens, verification mails will silently not be sent).
+    email:
+      from: {{ .Values.mas.email.from | quote }}
+      reply_to: {{ .Values.mas.email.replyTo | default .Values.mas.email.from | quote }}
+      transport: {{ .Values.mas.email.transport | default "smtp" | quote }}
+      mode: {{ .Values.mas.email.mode | default "plain" | quote }}
+      hostname: {{ .Values.mas.email.hostname | quote }}
+      port: {{ .Values.mas.email.port | default 587 }}
+      {{- if .Values.mas.email.username }}
+      username: {{ .Values.mas.email.username | quote }}
+      # Password can be inline (dev) or a `${EMAIL_PASSWORD}` placeholder
+      # substituted from mas.existingSecret by the render-config init container.
+      password: {{ .Values.mas.email.password | quote }}
+      {{- end }}
+    {{- end }}
+
     branding:
       service_name: "Matrix"
 
