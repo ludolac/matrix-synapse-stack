@@ -104,6 +104,12 @@ data:
     max_spider_size: 10M  # Maximum size of content to download for previews
     {{- end }}
 
+    {{- with .Values.synapse.server.roomListPublicationRules }}
+    # Who can publish rooms into the public directory (ordered rule list).
+    room_list_publication_rules:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+
     # TURN server configuration
     {{- if or .Values.synapse.server.turn.enabled .Values.coturn.enabled }}
     turn_uris:

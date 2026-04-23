@@ -122,6 +122,18 @@ synapse:
     urlPreviews:
       enabled: true
 
+    # Who can publish a room into the public directory. Matches Synapse's
+    # `room_list_publication_rules` verbatim — an ordered list of
+    # {user_id, alias, room_id, action} rules. Default Synapse behaviour
+    # (empty list) = server admins only. Set to a list to override.
+    # Docs: https://element-hq.github.io/synapse/latest/usage/configuration/config_documentation.html#room_list_publication_rules
+    roomListPublicationRules: []
+      # Example — allow any local user to publish any room:
+      # - user_id: "*"
+      #   alias: "*"
+      #   room_id: "*"
+      #   action: allow
+
     # TURN server configuration for VoIP/Video calls
     # TURN (Traversal Using Relays around NAT) is required for WebRTC calls to work
     # when users are behind NAT/firewalls
