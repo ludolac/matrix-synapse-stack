@@ -15,13 +15,17 @@ metadata:
 spec:
   cluster:
     name: {{ include "matrix-synapse.postgresql.cnpgClusterName" . }}
+  # CNPG Database CRD uses camelCase (Kubernetes convention). Emitting the
+  # snake_case variants is silently ignored by the API server and causes an
+  # infinite drift loop with ArgoCD as the webhook keeps filling in defaults.
+  ensure: present
   name: {{ .Values.mas.database.name }}
   # Reuse the Synapse role as owner (dev-friendly). For production isolation,
   # add a dedicated role via the Cluster's managed.roles and override this.
   owner: {{ .Values.postgresql.username }}
   encoding: UTF8
-  locale_collate: C
-  locale_c_type: C
-  # Do not drop the DB when this CR is deleted (extra safety on chart uninstall).
-  reclaim_policy: retain
+  localeCollate: C
+  localeCType: C
+  # Do not drop the DB when the Database CR is deleted (safety on uninstall).
+  databaseReclaimPolicy: retain
 {{- end }}
