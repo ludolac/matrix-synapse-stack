@@ -99,14 +99,16 @@ data:
               template: {{ $claims.email | default "{{ user.email }}" | quote }}
         {{- end }}
 
+    # Enable the local password auth subsystem only when password registration
+    # is on — otherwise MAS complains about a password backend without users.
     passwords:
-      enabled: false
+      enabled: {{ .Values.mas.account.passwordRegistrationEnabled }}
 
     account:
-      password_registration_enabled: false
-      login_with_email_allowed: false
-      registration_enabled: true
-      registration_mode: "oidc"
+      password_registration_enabled: {{ .Values.mas.account.passwordRegistrationEnabled }}
+      password_registration_email_required: {{ .Values.mas.account.passwordRegistrationEmailRequired }}
+      registration_token_required: {{ .Values.mas.account.registrationTokenRequired }}
+      login_with_email_allowed: {{ .Values.mas.account.loginWithEmailAllowed }}
 
     branding:
       service_name: "Matrix"
