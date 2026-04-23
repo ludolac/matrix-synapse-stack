@@ -38,6 +38,11 @@ data:
             # /health endpoint hit by the Deployment's liveness & readiness
             # probes — omitting this gets 404 and the pod never goes Ready.
             - name: health
+            {{- if .Values.mas.adminApiEnabled }}
+            # Admin API used by Ketesa (and other admin UIs) to manage users,
+            # registration tokens, sessions. Off by default.
+            - name: adminapi
+            {{- end }}
           binds:
             - address: '[::]:8080'
           proxy_protocol: false

@@ -859,6 +859,12 @@ mas:
   # want to enforce non-QR flows for some reason.
   qrCodeLoginEnabled: true
 
+  # Expose the MAS admin API (`adminapi` resource on the main HTTP listener).
+  # Required by Ketesa (synapseAdmin.*) and other external admin UIs to
+  # manage registration tokens, user sessions, email addresses, etc.
+  # Off by default to keep the surface minimal.
+  adminApiEnabled: false
+
   # Account behavior flags (MAS `account:` config section).
   # Defaults keep the chart in OIDC-only mode — flip passwordRegistrationEnabled
   # to true to allow local password accounts alongside upstream OIDC (useful
