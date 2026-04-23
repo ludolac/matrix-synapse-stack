@@ -942,6 +942,97 @@ mas:
   affinity: {}
 
 # ==============================================================================
+# Synapse-Admin (web UI for Matrix admin operations)
+# ==============================================================================
+# etkecc/synapse-admin (ex-Ketesa) is a React SPA that exposes the Synapse
+# Admin API behind a convenient web UI (user listing, deactivation, room
+# management, media quarantine, server stats). Complementary to MAS — MAS
+# handles authentication, synapse-admin handles administration.
+#
+# Scope:
+#   - Does NOT replace MAS — you still need MAS (or legacy OIDC) to log in.
+#   - Does NOT bypass Synapse's admin permission model — the user logging in
+#     must already be a server admin (via `mas-cli manage set-admin` or the
+#     equivalent in non-MAS mode).
+synapseAdmin:
+  enabled: false
+
+  image:
+    repository: ghcr.io/etkecc/synapse-admin
+    tag: "v1.2.0"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  # Restrict the homeservers this UI can talk to. STRONGLY recommended —
+  # without this, anyone reaching the UI could try to admin arbitrary other
+  # homeservers by typing their URL in the login form.
+  # Accepts a single URL (string) or a list of URLs.
+  # Leave empty to allow any homeserver (insecure, dev only).
+  restrictBaseUrl: ""  # e.g., "https://matrix.example.com"
+
+  # Set to true when your homeserver uses MAS (delegated auth). synapse-admin
+  # adjusts its flow to play nicely with OIDC sessions.
+  # Auto-defaulted to the same value as mas.enabled when left at null/empty.
+  externalAuthProvider: null
+
+  # CORS credential behavior for admin API requests. "include" is needed
+  # when the homeserver is on a different origin and auth cookies must
+  # travel along. "same-origin" is the safe default.
+  corsCredentials: "same-origin"
+
+  # Regex patterns for system / appservice-managed users that must be
+  # protected from accidental edits via the UI.
+  asManagedUsers: []
+    # - "^@_.*:example\\.com$"
+    # - "^@bot\\..*:example\\.com$"
+
+  # Custom menu entries (shown in the sidebar).
+  menu: []
+    # - label: "Documentation"
+    #   icon: "menu_book"
+    #   url: "https://example.com/docs"
+
+  # HTTPS Ingress — synapse-admin listens on container port 8080.
+  ingress:
+    className: "traefik"
+    host: "admin.example.com"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+      traefik.ingress.kubernetes.io/router.tls: "true"
+    tls:
+      secretName: "matrix-admin-tls"
+
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 32Mi
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 101
+    fsGroup: 101
+    seccompProfile:
+      type: RuntimeDefault
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 101
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# ==============================================================================
 # MatrixRTC / Element Call (group video calls)
 # ==============================================================================
 # Deploys the LiveKit SFU + lk-jwt-service + Element Call SPA required for

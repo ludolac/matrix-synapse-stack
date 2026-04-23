@@ -1,0 +1,45 @@
+{{- if and .Values.synapseAdmin.enabled .Values.networkPolicy.enabled }}
+# synapse-admin is a pure React SPA served by nginx — all API calls originate
+# from the USER'S BROWSER (targeting matrix.<domain>), not from the pod. The
+# pod has zero backend traffic, so the NP is strictly minimal.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-synapse-admin
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: synapse-admin
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: synapse-admin
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Traefik → synapse-admin
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingress.traefik.namespaceSelector | nindent 14 }}
+        {{- if .Values.networkPolicy.ingress.traefik.podSelector }}
+        - podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingress.traefik.podSelector | nindent 14 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # DNS only — no backend traffic required from this pod.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+{{- end }}
