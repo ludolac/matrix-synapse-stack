@@ -994,9 +994,12 @@ synapseAdmin:
     #   url: "https://example.com/docs"
 
   # HTTPS Ingress — synapse-admin listens on container port 8080.
+  # Default hostname follows the `matrix-*` naming scheme to stay grouped with
+  # the other Matrix subdomains (matrix.*, matrix-rtc.*). Override in your
+  # values-prod if you prefer another scheme.
   ingress:
     className: "traefik"
-    host: "admin.example.com"
+    host: "matrix-admin.example.com"
     annotations:
       cert-manager.io/cluster-issuer: "letsencrypt-prod"
       traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
