@@ -134,6 +134,16 @@ synapse:
       #   room_id: "*"
       #   action: allow
 
+    # MatrixRTC transports (MSC4143) advertised by Synapse to authenticated
+    # clients. Only effective when rtc.enabled=true (enables msc4143_enabled
+    # automatically). Leave empty to auto-derive a single LiveKit transport
+    # pointing at rtc.ingress.backend.host (matches the well-known rtc_foci).
+    # Override for multi-backend setups or federated SFUs.
+    matrixRtc:
+      transports: []
+        # - type: livekit
+        #   livekit_service_url: "https://matrix-rtc.example.com/livekit/jwt"
+
     # TURN server configuration for VoIP/Video calls
     # TURN (Traversal Using Relays around NAT) is required for WebRTC calls to work
     # when users are behind NAT/firewalls

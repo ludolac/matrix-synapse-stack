@@ -185,6 +185,11 @@ data:
       # MatrixRTC (Element Call group calls): room summary + delayed events.
       msc3266_enabled: true
       msc4140_enabled: true
+      # MSC4143: server-advertised RTC transports (clients call
+      # /_matrix/client/unstable/org.matrix.msc4143/rtc/transports to discover
+      # the SFU). Without this, calls "connect" but get terminated after 15-30s
+      # because the client can't negotiate the transport. See synapse#19621.
+      msc4143_enabled: true
       {{- end }}
       {{- if .Values.mas.enabled }}
       # MSC3861: delegated authentication via Matrix Authentication Service.
@@ -210,6 +215,20 @@ data:
     {{- if .Values.rtc.enabled }}
     # Maximum lifetime for a delayed event (keep calls from leaking forever)
     max_event_delay_duration: 24h
+
+    # MSC4143 server-side transport advertisement. Matches the well-known
+    # `org.matrix.msc4143.rtc_foci` entry — Synapse serves the same list
+    # to authenticated clients via /_matrix/client/unstable/.../rtc/transports.
+    # Override by setting .Values.synapse.server.matrixRtc.transports to a
+    # custom list; otherwise auto-derived from rtc.ingress.backend.host.
+    matrix_rtc:
+      transports:
+        {{- with .Values.synapse.server.matrixRtc.transports }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
+        - type: livekit
+          livekit_service_url: "https://{{ .Values.rtc.ingress.backend.host }}/livekit/jwt"
+        {{- end }}
     {{- end }}
     {{- end }}
 
