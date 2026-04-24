@@ -61,11 +61,16 @@ data:
       json: false
 
     # Room settings
+    {{- $room := .Values.rtc.livekit.room | default dict }}
     room:
       auto_create: false           # Let lk-jwt-service authorize room creation
-      enable_remote_unmute: true
-      max_participants: 16         # Element Call default cap
-      empty_timeout: 300           # 5 min after last participant leaves
+      enable_remote_unmute: {{ $room.enableRemoteUnmute | default true }}
+      # max_participants is a HARD cap enforced by the SFU. Raise when running
+      # large conferences (Element Call's default UI caps at ~50). Each active
+      # participant adds CPU + bandwidth load linearly on the SFU pod.
+      max_participants: {{ $room.maxParticipants | default 16 }}
+      # Seconds to keep an empty LiveKit room open before auto-closing.
+      empty_timeout: {{ $room.emptyTimeout | default 300 }}
 
     # Note: livekit-server does not accept a top-level `health:` block.
     # Health is always served on the signaling port (HTTP GET / returns 200).

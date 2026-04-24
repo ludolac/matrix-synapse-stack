@@ -1182,6 +1182,22 @@ rtc:
     apiSecret: ""
     existingSecret: ""  # Optional: name of pre-existing secret
 
+    # LiveKit room-level defaults (rendered under `room:` in config.yaml).
+    # All fields optional — the template applies LiveKit's own defaults when
+    # a field is unset.
+    room:
+      # Hard cap on participants per LiveKit room. Raise for large
+      # conferences (Element Call UI tolerates ~50). Each active participant
+      # adds CPU + egress bandwidth linearly on the SFU pod — bump the
+      # deployment's resources proportionally.
+      maxParticipants: 16
+      # Seconds to keep an empty LiveKit room open before auto-closing.
+      # Dropped to 30-60s for ephemeral-call scenarios, raised to 900+ for
+      # persistent meeting rooms.
+      emptyTimeout: 300
+      # Allow SFU to unmute other participants remotely (moderator actions).
+      enableRemoteUnmute: true
+
     # UDP LoadBalancer for WebRTC media (muxed mode = single UDP port for
     # all sessions via SCTP/DTLS). Much cheaper than a port range.
     service:
