@@ -325,6 +325,24 @@ synapse:
     timeoutSeconds: 3
     failureThreshold: 30
 
+  # Horizontal Pod Autoscaler for Synapse.
+  # NOTE: Synapse single-worker mode (this chart's default) tolerates 2-3
+  # replicas in practice — all HTTP routes work, DB writes serialize on the
+  # primary. For heavy-load deployments, consider a multi-worker setup (not
+  # yet supported by this chart).
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    # Synapse is CPU-bound on regex/crypto/DB hashing. 60% threshold leaves
+    # headroom for request spikes before new replicas come online.
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 75
+    # Optional behavior:
+    # behavior:
+    #   scaleDown:
+    #     stabilizationWindowSeconds: 300
+
 # Element Web configuration
 element:
   enabled: true
@@ -954,6 +972,18 @@ mas:
   # session on pod restart. Bump to 3+ for heavy traffic. MAS is stateless
   # (all state lives in PostgreSQL), scaling is linear.
   replicaCount: 2
+
+  # Horizontal Pod Autoscaler for MAS.
+  # MAS is fully stateless (all state in PostgreSQL) — HPA is safe to enable.
+  # Typical CPU spikes happen on login bursts and token refresh storms.
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    # behavior:
+    #   scaleDown:
+    #     stabilizationWindowSeconds: 300
 
   # Public URL of MAS — advertised via .well-known and used by Synapse as the
   # OAuth2 issuer. Must match the Ingress host. Pick a hostname dedicated to
