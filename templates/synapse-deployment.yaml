@@ -16,7 +16,18 @@ spec:
   template:
     metadata:
       annotations:
+        # ConfigMap of the base homeserver-override.yaml (non-secret values).
         checksum/config: {{ include (print $.Template.BasePath "/synapse-configmap.yaml") . | sha256sum }}
+        # Chart-managed Secrets whose content flows into homeserver-override.yaml
+        # via the initContainer's sed pass. Rotating any of these through the
+        # chart (standalone postgres password, autogen livekit keys, etc.)
+        # triggers a rolling restart so the new values take effect.
+        # Note: external Secrets (matrix-synapse-admin-credentials,
+        # matrix-synapse-sso-credentials, matrix-synapse-turn-credentials,
+        # mas.existingSecret) are NOT tracked — rotate them with
+        # `kubectl rollout restart deploy/<release>-synapse` or via
+        # stakater/reloader `reloader.stakater.com/auto: "true"`.
+        checksum/postgresql-secret: {{ include (print $.Template.BasePath "/postgresql-secret.yaml") . | sha256sum }}
         {{- with .Values.synapse.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

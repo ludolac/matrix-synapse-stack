@@ -5,6 +5,9 @@
 {{- if not .Values.mas.upstreamOauth2.providers -}}
 {{- fail "mas.upstreamOauth2.providers must contain at least one provider (e.g. Authelia). MAS is OIDC-only in this chart." -}}
 {{- end -}}
+{{- if not (hasSuffix "/" .Values.mas.publicUrl) -}}
+{{- fail (printf "mas.publicUrl must end with a trailing slash — got %q. MSC3861 uses the value as OAuth2 issuer and Synapse will reject tokens issued against an issuer without trailing slash." .Values.mas.publicUrl) -}}
+{{- end -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:

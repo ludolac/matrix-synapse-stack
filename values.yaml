@@ -450,6 +450,28 @@ tolerations: []
 # Affinity
 affinity: {}
 
+# Well-known server (nginx serving /.well-known/matrix/{server,client}).
+# Always deployed (both federation auto-discovery and client auto-config
+# depend on it). Section exists so operators can scale it without editing
+# the template.
+wellknown:
+  # 2 replicas by default for HA across nodes. Bump higher for intense
+  # federation traffic; drop to 1 for dev/homelab to save resources.
+  replicaCount: 2
+
+  image:
+    repository: nginx
+    tag: "1.25-alpine"
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
 # Network policy
 # Creates separate NetworkPolicies for each component (Synapse, Element, PostgreSQL, Well-known)
 # with fine-grained ingress and egress rules
@@ -682,9 +704,11 @@ coturn:
   # This should be the public IP where clients can reach the TURN server
   externalIP: ""
   
-  # Realm for TURN authentication
-  # Usually matches your domain
-  realm: "turn.example.com"
+  # Realm for TURN authentication. Must match the homeserver name for Synapse
+  # shared-secret validation to succeed. Leave empty to auto-derive from
+  # synapse.server.name (recommended — the previous `turn.example.com` default
+  # was a common source of "401 Unauthorized" on TURN).
+  realm: ""
   
   # Relay port range for media traffic
   # These ports need to be opened in firewall/security groups
@@ -912,7 +936,11 @@ mas:
     tag: "1.15.0"
     pullPolicy: IfNotPresent
 
-  replicaCount: 1
+  # 2 replicas by default — MAS is in the hot path of every OAuth2 token
+  # exchange, so a single-pod SPoF would lock out every Element/ElementX
+  # session on pod restart. Bump to 3+ for heavy traffic. MAS is stateless
+  # (all state lives in PostgreSQL), scaling is linear.
+  replicaCount: 2
 
   # Public URL of MAS — advertised via .well-known and used by Synapse as the
   # OAuth2 issuer. Must match the Ingress host. Pick a hostname dedicated to
