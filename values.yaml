@@ -382,6 +382,19 @@ element:
       # Custom CSS for additional styling
       customCssUrl: ""
 
+    # Element Call widget integration (only rendered in config.json when
+    # rtc.enabled=true — otherwise Element won't show the group-call button).
+    elementCall:
+      # Force Element Call for ALL calls, even 1-to-1 DMs. When true, the
+      # legacy "Video call" (m.call.invite) button is hidden. Recommended
+      # when LiveKit SFU is deployed — unified UX + screen share/raise hand
+      # consistently available everywhere.
+      useExclusively: false
+      # Hint shown to clients (informational, not enforced by the SFU).
+      participantLimit: 8
+      # Brand name in the widget header. Override with your deployment name.
+      brand: "Element Call"
+
   # Security context
   securityContext:
     allowPrivilegeEscalation: false
