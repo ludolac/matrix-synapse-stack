@@ -343,6 +343,14 @@ synapse:
     #   scaleDown:
     #     stabilizationWindowSeconds: 300
 
+  # PodDisruptionBudget — prevents voluntary eviction of all Synapse replicas
+  # at once (cluster drain, node autoscale). Enable only when replicaCount > 1
+  # otherwise drain commands block indefinitely.
+  pdb:
+    enabled: false
+    minAvailable: 1
+    # maxUnavailable: 1     # alternative, mutually exclusive with minAvailable
+
 # Element Web configuration
 element:
   enabled: true
@@ -353,6 +361,13 @@ element:
     pullPolicy: IfNotPresent
 
   replicaCount: 2
+
+  # PodDisruptionBudget for Element Web.
+  # User-facing — loss of all replicas kills access for every connected user
+  # until one comes back. Enable alongside replicaCount > 1.
+  pdb:
+    enabled: false
+    minAvailable: 1
 
   # Service configuration
   service:
@@ -502,6 +517,14 @@ wellknown:
     limits:
       cpu: 100m
       memory: 64Mi
+
+  # PodDisruptionBudget for wellknown.
+  # Federation auto-discovery depends on .well-known — full outage breaks
+  # incoming federation until a replica comes back. Enable when replicaCount
+  # > 1 (the chart default).
+  pdb:
+    enabled: false
+    minAvailable: 1
 
 # Network policy
 # Creates separate NetworkPolicies for each component (Synapse, Element, PostgreSQL, Well-known)
@@ -984,6 +1007,14 @@ mas:
     # behavior:
     #   scaleDown:
     #     stabilizationWindowSeconds: 300
+
+  # PodDisruptionBudget for MAS.
+  # Critical — MAS is in the auth path of every client. Recommend enabling
+  # alongside the default replicaCount: 2 so cluster drains keep at least
+  # one MAS pod running.
+  pdb:
+    enabled: false
+    minAvailable: 1
 
   # Public URL of MAS — advertised via .well-known and used by Synapse as the
   # OAuth2 issuer. Must match the Ingress host. Pick a hostname dedicated to

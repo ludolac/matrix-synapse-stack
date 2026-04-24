@@ -1,0 +1,84 @@
+{{/*
+PodDisruptionBudget helper: emits one PDB per component whose `.pdb.enabled`
+flag is true.
+
+Why PDBs:
+  A PDB tells the Kubernetes scheduler "never voluntarily evict all pods of
+  this Deployment at once" — protects against cluster drains, node upgrades,
+  and overly-aggressive rolling updates. Without a PDB, `kubectl drain`
+  or a node autoscaler can kill every replica simultaneously, causing a
+  few minutes of outage on critical paths (auth via MAS, homeserver access
+  via Synapse, UI via Element Web).
+
+Caveats:
+  - Incompatible with Deployments running ONE replica (PDB blocks the single
+    eviction → drain hangs). The template skips when minAvailable >= replicas.
+  - Only `minAvailable` is exposed; for percentage-based disruption use the
+    Helm values directly. `maxUnavailable` is mutually exclusive.
+
+Not covered:
+  - PostgreSQL (CNPG operator manages its own PDB)
+  - LiveKit (sticky sessions — a PDB would block rollouts; scale manually)
+  - RTC JWT service / Element Call SPA (low traffic, stateless, optional)
+  - Coturn (UDP, often single instance on purpose)
+*/}}
+
+{{- define "matrix-synapse.pdb" -}}
+{{- $ := .ctx -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "matrix-synapse.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ .component }}
+spec:
+  {{- if .cfg.minAvailable }}
+  minAvailable: {{ .cfg.minAvailable }}
+  {{- else if .cfg.maxUnavailable }}
+  maxUnavailable: {{ .cfg.maxUnavailable }}
+  {{- else }}
+  minAvailable: 1
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "matrix-synapse.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ .component }}
+{{- end -}}
+
+{{- $fullname := include "matrix-synapse.fullname" . }}
+
+{{- /* Synapse */}}
+{{- with .Values.synapse.pdb }}
+{{- if .enabled }}
+{{- include "matrix-synapse.pdb" (dict "ctx" $ "name" (printf "%s-synapse" $fullname) "component" "synapse" "cfg" .) }}
+---
+{{- end }}
+{{- end }}
+
+{{- /* Element Web (only when element.enabled) */}}
+{{- if .Values.element.enabled }}
+{{- with .Values.element.pdb }}
+{{- if .enabled }}
+{{- include "matrix-synapse.pdb" (dict "ctx" $ "name" (printf "%s-element" $fullname) "component" "element-web" "cfg" .) }}
+---
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- /* Well-known */}}
+{{- with .Values.wellknown.pdb }}
+{{- if .enabled }}
+{{- include "matrix-synapse.pdb" (dict "ctx" $ "name" (printf "%s-wellknown" $fullname) "component" "wellknown" "cfg" .) }}
+---
+{{- end }}
+{{- end }}
+
+{{- /* MAS (only when mas.enabled) */}}
+{{- if .Values.mas.enabled }}
+{{- with .Values.mas.pdb }}
+{{- if .enabled }}
+{{- include "matrix-synapse.pdb" (dict "ctx" $ "name" (printf "%s-mas" $fullname) "component" "mas" "cfg" .) }}
+{{- end }}
+{{- end }}
+{{- end }}
