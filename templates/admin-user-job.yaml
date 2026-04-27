@@ -1,10 +1,4 @@
-{{/*
-  The register_new_matrix_user flow relies on registration_shared_secret which
-  is incompatible with MSC3861/MAS. When mas.enabled=true, create admin users
-  with `kubectl exec deploy/<release>-mas -- mas-cli manage set-admin <localpart>`
-  after the user has logged in once via the upstream OIDC (Authelia).
-*/}}
-{{- if and .Values.synapse.server.adminUser.enabled (not .Values.mas.enabled) }}
+{{- if .Values.synapse.server.adminUser.enabled }}
 apiVersion: batch/v1
 kind: Job
 metadata:

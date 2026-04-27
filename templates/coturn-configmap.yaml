@@ -28,10 +28,8 @@ data:
     min-port={{ .Values.coturn.relayPortRange.min }}
     max-port={{ .Values.coturn.relayPortRange.max }}
 
-    # Realm for TURN server. Auto-derives from synapse.server.name when
-    # coturn.realm is empty — the two must match for Matrix TURN auth
-    # validation to succeed.
-    realm={{ .Values.coturn.realm | default .Values.synapse.server.name }}
+    # Realm for TURN server
+    realm={{ .Values.coturn.realm }}
 
     # Authentication - use shared secret (passed via command line argument)
     use-auth-secret

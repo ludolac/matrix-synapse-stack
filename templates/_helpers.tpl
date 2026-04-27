@@ -168,10 +168,3 @@ postgres-password
 {{ .Values.postgresql.external.existingSecret.passwordKey | default "password" }}
 {{- end -}}
 {{- end }}
-
-{{/*
-Former helper matrix-synapse.mas.envSecrets was removed in chart 2.0.x — MAS
-now loads secrets via a render-config init container that substitutes ${VAR}
-placeholders in the config YAML (MAS does not apply Tera to config.yaml,
-only to HTML templates). See templates/mas-deployment.yaml.
-*/}}

@@ -20,12 +20,7 @@ data:
       },
       "org.matrix.msc3575.proxy": {
         "url": "https://{{ .Values.synapse.server.name }}"
-      }{{- if .Values.mas.enabled }},
-      "org.matrix.msc2965.authentication": {
-        "issuer": {{ .Values.mas.publicUrl | quote }},
-        "account": "{{ .Values.mas.publicUrl | trimSuffix "/" }}/account"
-      }
-      {{- end }}{{- if .Values.rtc.enabled }},
+      }{{- if .Values.rtc.enabled }},
       "org.matrix.msc4143.rtc_foci": [
         {
           "type": "livekit",

@@ -122,28 +122,6 @@ synapse:
     urlPreviews:
       enabled: true
 
-    # Who can publish a room into the public directory. Matches Synapse's
-    # `room_list_publication_rules` verbatim — an ordered list of
-    # {user_id, alias, room_id, action} rules. Default Synapse behaviour
-    # (empty list) = server admins only. Set to a list to override.
-    # Docs: https://element-hq.github.io/synapse/latest/usage/configuration/config_documentation.html#room_list_publication_rules
-    roomListPublicationRules: []
-      # Example — allow any local user to publish any room:
-      # - user_id: "*"
-      #   alias: "*"
-      #   room_id: "*"
-      #   action: allow
-
-    # MatrixRTC transports (MSC4143) advertised by Synapse to authenticated
-    # clients. Only effective when rtc.enabled=true (enables msc4143_enabled
-    # automatically). Leave empty to auto-derive a single LiveKit transport
-    # pointing at rtc.ingress.backend.host (matches the well-known rtc_foci).
-    # Override for multi-backend setups or federated SFUs.
-    matrixRtc:
-      transports: []
-        # - type: livekit
-        #   livekit_service_url: "https://matrix-rtc.example.com/livekit/jwt"
-
     # TURN server configuration for VoIP/Video calls
     # TURN (Traversal Using Relays around NAT) is required for WebRTC calls to work
     # when users are behind NAT/firewalls
@@ -172,10 +150,6 @@ synapse:
       requireTransportSecurity: true
       notifFrom: "Matrix <noreply@example.com>"
       appName: "Matrix"
-      # Public URL of the Element Web instance. Used in room-invite email
-      # links (e.g. "Accept invite" button). Leave empty to fall back to
-      # Synapse's default (https://app.element.io).
-      clientBaseUrl: ""
 
     # Multi-Factor Authentication (MFA) / Two-Factor Authentication (2FA)
     mfa:
@@ -320,11 +294,17 @@ synapse:
     timeoutSeconds: 3
     failureThreshold: 3
 
-  # Note: Matrix Authentication Service (MAS) integration is now a top-level
-  # section `mas:` at the bottom of this file. When `mas.enabled=true`, Synapse
-  # is automatically configured with MSC3861 delegated auth and the legacy
-  # password_config / oidc_providers / registration_shared_secret blocks are
-  # removed (they conflict with MSC3861).
+  # Matrix Authentication Service (MAS) Integration
+  # See MAS-INTEGRATION-GUIDE.md for full implementation details
+  # This is disabled by default - enable when ready to implement MAS
+  mas:
+    enabled: false
+    # When enabled, Synapse will delegate authentication to MAS
+    # Requires MAS to be deployed separately (templates not yet included)
+    issuer: ""  # e.g., "https://auth.waadoo.ovh/"
+    accountManagementUrl: ""  # e.g., "https://auth.waadoo.ovh/account"
+    clientId: "synapse"
+    clientSecret: ""  # From Kubernetes secret
 
   startupProbe:
     httpGet:
@@ -334,32 +314,6 @@ synapse:
     periodSeconds: 10
     timeoutSeconds: 3
     failureThreshold: 30
-
-  # Horizontal Pod Autoscaler for Synapse.
-  # NOTE: Synapse single-worker mode (this chart's default) tolerates 2-3
-  # replicas in practice — all HTTP routes work, DB writes serialize on the
-  # primary. For heavy-load deployments, consider a multi-worker setup (not
-  # yet supported by this chart).
-  autoscaling:
-    enabled: false
-    minReplicas: 1
-    maxReplicas: 3
-    # Synapse is CPU-bound on regex/crypto/DB hashing. 60% threshold leaves
-    # headroom for request spikes before new replicas come online.
-    targetCPUUtilizationPercentage: 60
-    targetMemoryUtilizationPercentage: 75
-    # Optional behavior:
-    # behavior:
-    #   scaleDown:
-    #     stabilizationWindowSeconds: 300
-
-  # PodDisruptionBudget — prevents voluntary eviction of all Synapse replicas
-  # at once (cluster drain, node autoscale). Enable only when replicaCount > 1
-  # otherwise drain commands block indefinitely.
-  pdb:
-    enabled: false
-    minAvailable: 1
-    # maxUnavailable: 1     # alternative, mutually exclusive with minAvailable
 
 # Element Web configuration
 element:
@@ -371,13 +325,6 @@ element:
     pullPolicy: IfNotPresent
 
   replicaCount: 2
-
-  # PodDisruptionBudget for Element Web.
-  # User-facing — loss of all replicas kills access for every connected user
-  # until one comes back. Enable alongside replicaCount > 1.
-  pdb:
-    enabled: false
-    minAvailable: 1
 
   # Service configuration
   service:
@@ -424,19 +371,6 @@ element:
       welcomeBackgroundUrl: ""
       # Custom CSS for additional styling
       customCssUrl: ""
-
-    # Element Call widget integration (only rendered in config.json when
-    # rtc.enabled=true — otherwise Element won't show the group-call button).
-    elementCall:
-      # Force Element Call for ALL calls, even 1-to-1 DMs. When true, the
-      # legacy "Video call" (m.call.invite) button is hidden. Recommended
-      # when LiveKit SFU is deployed — unified UX + screen share/raise hand
-      # consistently available everywhere.
-      useExclusively: false
-      # Hint shown to clients (informational, not enforced by the SFU).
-      participantLimit: 8
-      # Brand name in the widget header. Override with your deployment name.
-      brand: "Element Call"
 
   # Security context
   securityContext:
@@ -505,36 +439,6 @@ tolerations: []
 
 # Affinity
 affinity: {}
-
-# Well-known server (nginx serving /.well-known/matrix/{server,client}).
-# Always deployed (both federation auto-discovery and client auto-config
-# depend on it). Section exists so operators can scale it without editing
-# the template.
-wellknown:
-  # 2 replicas by default for HA across nodes. Bump higher for intense
-  # federation traffic; drop to 1 for dev/homelab to save resources.
-  replicaCount: 2
-
-  image:
-    repository: nginx
-    tag: "1.25-alpine"
-    pullPolicy: IfNotPresent
-
-  resources:
-    requests:
-      cpu: 10m
-      memory: 16Mi
-    limits:
-      cpu: 100m
-      memory: 64Mi
-
-  # PodDisruptionBudget for wellknown.
-  # Federation auto-discovery depends on .well-known — full outage breaks
-  # incoming federation until a replica comes back. Enable when replicaCount
-  # > 1 (the chart default).
-  pdb:
-    enabled: false
-    minAvailable: 1
 
 # Network policy
 # Creates separate NetworkPolicies for each component (Synapse, Element, PostgreSQL, Well-known)
@@ -768,11 +672,9 @@ coturn:
   # This should be the public IP where clients can reach the TURN server
   externalIP: ""
   
-  # Realm for TURN authentication. Must match the homeserver name for Synapse
-  # shared-secret validation to succeed. Leave empty to auto-derive from
-  # synapse.server.name (recommended — the previous `turn.example.com` default
-  # was a common source of "401 Unauthorized" on TURN).
-  realm: ""
+  # Realm for TURN authentication
+  # Usually matches your domain
+  realm: "turn.example.com"
   
   # Relay port range for media traffic
   # These ports need to be opened in firewall/security groups
@@ -917,303 +819,6 @@ coturn:
     # cli-password=mypassword
 
 # ==============================================================================
-# Matrix Authentication Service (MAS)
-# ==============================================================================
-# Deploys MAS as the authentication/authorization backend for Synapse.
-# When enabled, Synapse delegates auth via MSC3861 (OAuth2) and the legacy
-# password/OIDC/registration_shared_secret paths are removed from the Synapse
-# config (they are incompatible with MSC3861).
-#
-# Prerequisites:
-#   - CNPG operator (CRD `Database` from CNPG 1.25+) — the chart provisions a
-#     dedicated DB `mas_prod` in the existing postgresql.cnpg cluster.
-#   - An upstream OIDC IdP (e.g. Authelia) — used by MAS to authenticate users.
-#   - DNS record: auth.<domain>
-#
-# Bootstrap flow (no legacy migration — wipe + redeploy):
-#   1. Generate cryptographic material: scripts/generate-mas-secrets.sh
-#   2. Create Kubernetes secret referenced by mas.existingSecret
-#   3. Deploy the chart with mas.enabled=true
-#   4. User logs in once via Authelia (creates MAS account linked to OIDC)
-#   5. Promote to admin: kubectl exec deploy/<release>-mas -- mas-cli manage \
-#        set-admin <localpart> --admin
-#
-# See README section "Matrix Authentication Service (MAS)" for details.
-mas:
-  enabled: false
-
-  # Enable device-to-device QR code sign-in (MSC4108). Only meaningful with
-  # mas.enabled=true: the feature requires delegated auth. Disable only if you
-  # want to enforce non-QR flows for some reason.
-  qrCodeLoginEnabled: true
-
-  # Expose the MAS admin API (`adminapi` resource on the main HTTP listener).
-  # Required by Ketesa (synapseAdmin.*) and other external admin UIs to
-  # manage registration tokens, user sessions, email addresses, etc.
-  # Off by default to keep the surface minimal.
-  adminApiEnabled: false
-
-  # Account behavior flags (MAS `account:` config section).
-  # Defaults keep the chart in OIDC-only mode — flip passwordRegistrationEnabled
-  # to true to allow local password accounts alongside upstream OIDC (useful
-  # for invite-only provisional accounts without adding users in Authelia).
-  account:
-    # Allow creating local password-based accounts via /register (in addition
-    # to upstream OIDC). When false, users must sign in via an upstream IdP.
-    passwordRegistrationEnabled: false
-
-    # When password registration is enabled: require an email during signup.
-    # Recommended for account recovery and audit.
-    passwordRegistrationEmailRequired: true
-
-    # When password registration is enabled: require a pre-issued registration
-    # token (generated by admin via `mas-cli manage issue-user-registration-token`).
-    # Effectively makes registration invite-only — strongly recommended.
-    registrationTokenRequired: true
-
-    # Allow users to sign in with their email address instead of their local
-    # Matrix handle (@alice:example.com). Off by default.
-    loginWithEmailAllowed: false
-
-  # Email configuration (SMTP relay).
-  # Without this, MAS logs "An email was supposed to be sent but no email
-  # backend is configured" on every password reset, registration token
-  # delivery, email verification, etc. — users don't receive anything.
-  # Leave `hostname` empty to skip the email block entirely (OIDC-only
-  # deployments without password registration don't need email).
-  #
-  # For password safety: set `password` to "${EMAIL_PASSWORD}" and add
-  # `EMAIL_PASSWORD` to your `mas.existingSecret`. The render-config init
-  # container will substitute it at pod startup (avoids plain-text in etcd).
-  email:
-    from: "Matrix <noreply@example.com>"
-    replyTo: ""                       # optional, defaults to `from`
-    transport: smtp                    # smtp | sendmail | blackhole
-    mode: plain                        # plain | tls | starttls
-    hostname: ""                       # SMTP relay host — empty disables email
-    port: 587
-    username: ""
-    password: ""
-
-  image:
-    repository: ghcr.io/element-hq/matrix-authentication-service
-    tag: "1.15.0"
-    pullPolicy: IfNotPresent
-
-  # 2 replicas by default — MAS is in the hot path of every OAuth2 token
-  # exchange, so a single-pod SPoF would lock out every Element/ElementX
-  # session on pod restart. Bump to 3+ for heavy traffic. MAS is stateless
-  # (all state lives in PostgreSQL), scaling is linear.
-  replicaCount: 2
-
-  # Horizontal Pod Autoscaler for MAS.
-  # MAS is fully stateless (all state in PostgreSQL) — HPA is safe to enable.
-  # Typical CPU spikes happen on login bursts and token refresh storms.
-  autoscaling:
-    enabled: false
-    minReplicas: 2
-    maxReplicas: 5
-    targetCPUUtilizationPercentage: 70
-    # behavior:
-    #   scaleDown:
-    #     stabilizationWindowSeconds: 300
-
-  # PodDisruptionBudget for MAS.
-  # Critical — MAS is in the auth path of every client. Recommend enabling
-  # alongside the default replicaCount: 2 so cluster drains keep at least
-  # one MAS pod running.
-  pdb:
-    enabled: false
-    minAvailable: 1
-
-  # Public URL of MAS — advertised via .well-known and used by Synapse as the
-  # OAuth2 issuer. Must match the Ingress host. Pick a hostname dedicated to
-  # MAS (e.g. mas.<domain>) — do NOT reuse the hostname of your upstream IdP
-  # (Authelia / Keycloak) since both need to be reachable independently.
-  publicUrl: "https://mas.example.com/"
-
-  # Database. MAS requires its own PostgreSQL database (not shared with Synapse).
-  # When postgresql.mode=cnpg, the chart can provision a dedicated DB via the
-  # CNPG `Database` CRD inside the existing cluster.
-  database:
-    # cnpg: use the chart's existing CNPG cluster and provision mas_prod there
-    # external: use an external PostgreSQL, credentials via existingSecret
-    mode: cnpg
-
-    # Name of the database and owner role (when mode=cnpg)
-    name: mas_prod
-    username: mas
-
-    # When mode=external: point to an existing secret with keys
-    # DATABASE_HOST, DATABASE_PORT, DATABASE_NAME, DATABASE_USERNAME,
-    # DATABASE_PASSWORD.
-    external:
-      existingSecret: ""
-
-  # Upstream OIDC provider(s) — MAS delegates authentication to these.
-  # At least one provider is required. Leave the list empty to disable MAS.
-  upstreamOauth2:
-    providers: []
-      # Example for Authelia:
-      # - id: authelia
-      #   issuer: "https://authelia.example.com"
-      #   clientId: "matrix"          # reuse existing Authelia OIDC client
-      #   # Secret key name inside mas.existingSecret holding the client secret:
-      #   clientSecretKey: "AUTHELIA_CLIENT_SECRET"
-      #   scope: "openid profile email"
-      #   claimsImports:
-      #     localpart: "{{ user.preferred_username }}"
-      #     displayname: "{{ user.name }}"
-      #     email: "{{ user.email }}"
-
-  # Secrets for MAS (encryption key, signing keys, Synapse shared secret,
-  # admin token). Generate with scripts/generate-mas-secrets.sh and reference
-  # the resulting Secret here. The chart will NOT auto-generate these (RSA
-  # keys cannot be safely generated from Helm templates).
-  existingSecret: ""  # e.g., "matrix-synapse-mas-secrets"
-
-  # Ingress (HTTPS UI + OAuth endpoints). MAS listens on 8080 internally.
-  ingress:
-    className: "traefik"
-    # Must match the hostname in publicUrl above.
-    host: "mas.example.com"
-    annotations:
-      cert-manager.io/cluster-issuer: "letsencrypt-prod"
-      traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
-      traefik.ingress.kubernetes.io/router.tls: "true"
-    tls:
-      secretName: "matrix-mas-tls"
-
-  resources:
-    limits:
-      cpu: 500m
-      memory: 512Mi
-    requests:
-      cpu: 50m
-      memory: 128Mi
-
-  podSecurityContext:
-    runAsNonRoot: true
-    runAsUser: 10001
-    runAsGroup: 10001
-    fsGroup: 10001
-    seccompProfile:
-      type: RuntimeDefault
-
-  securityContext:
-    allowPrivilegeEscalation: false
-    capabilities:
-      drop:
-        - ALL
-    readOnlyRootFilesystem: true
-    runAsNonRoot: true
-    runAsUser: 10001
-
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
-
-# ==============================================================================
-# Ketesa (web UI for Matrix admin operations, formerly known as synapse-admin)
-# ==============================================================================
-# Ketesa is a React SPA that exposes the Synapse Admin API (and the MAS admin
-# API when deployed together) behind a convenient web UI: user listing,
-# deactivation, room management, media quarantine, server stats, and
-# **registration token administration** (both Synapse and MAS tokens).
-#
-# The project was renamed from "etkecc/synapse-admin" to "etkecc/ketesa" —
-# same codebase. The Helm values key stays `synapseAdmin` to avoid breaking
-# existing deployments.
-#
-# Scope:
-#   - Does NOT replace MAS — you still need MAS (or legacy OIDC) to log in.
-#   - Does NOT bypass Synapse's admin permission model — the user logging in
-#     must already be a server admin (via `mas-cli manage set-admin` or the
-#     equivalent in non-MAS mode).
-synapseAdmin:
-  enabled: false
-
-  image:
-    # New canonical image path (project rename — see upstream:
-    # https://github.com/etkecc/ketesa).
-    repository: ghcr.io/etkecc/ketesa
-    tag: "v1.2.0"
-    pullPolicy: IfNotPresent
-
-  replicaCount: 1
-
-  # Restrict the homeservers this UI can talk to. STRONGLY recommended —
-  # without this, anyone reaching the UI could try to admin arbitrary other
-  # homeservers by typing their URL in the login form.
-  # Accepts a single URL (string) or a list of URLs.
-  # Leave empty to allow any homeserver (insecure, dev only).
-  restrictBaseUrl: ""  # e.g., "https://matrix.example.com"
-
-  # Set to true when your homeserver uses MAS (delegated auth). synapse-admin
-  # adjusts its flow to play nicely with OIDC sessions.
-  # Auto-defaulted to the same value as mas.enabled when left at null/empty.
-  externalAuthProvider: null
-
-  # CORS credential behavior for admin API requests. "include" is needed
-  # when the homeserver is on a different origin and auth cookies must
-  # travel along. "same-origin" is the safe default.
-  corsCredentials: "same-origin"
-
-  # Regex patterns for system / appservice-managed users that must be
-  # protected from accidental edits via the UI.
-  asManagedUsers: []
-    # - "^@_.*:example\\.com$"
-    # - "^@bot\\..*:example\\.com$"
-
-  # Custom menu entries (shown in the sidebar).
-  menu: []
-    # - label: "Documentation"
-    #   icon: "menu_book"
-    #   url: "https://example.com/docs"
-
-  # HTTPS Ingress — synapse-admin listens on container port 8080.
-  # Default hostname follows the `matrix-*` naming scheme to stay grouped with
-  # the other Matrix subdomains (matrix.*, matrix-rtc.*). Override in your
-  # values-prod if you prefer another scheme.
-  ingress:
-    className: "traefik"
-    host: "matrix-admin.example.com"
-    annotations:
-      cert-manager.io/cluster-issuer: "letsencrypt-prod"
-      traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
-      traefik.ingress.kubernetes.io/router.tls: "true"
-    tls:
-      secretName: "matrix-admin-tls"
-
-  resources:
-    limits:
-      cpu: 200m
-      memory: 128Mi
-    requests:
-      cpu: 50m
-      memory: 32Mi
-
-  podSecurityContext:
-    runAsNonRoot: true
-    runAsUser: 101
-    fsGroup: 101
-    seccompProfile:
-      type: RuntimeDefault
-
-  securityContext:
-    allowPrivilegeEscalation: false
-    capabilities:
-      drop:
-        - ALL
-    readOnlyRootFilesystem: true
-    runAsNonRoot: true
-    runAsUser: 101
-
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
-
-# ==============================================================================
 # MatrixRTC / Element Call (group video calls)
 # ==============================================================================
 # Deploys the LiveKit SFU + lk-jwt-service + Element Call SPA required for
@@ -1253,22 +858,6 @@ rtc:
     apiSecret: ""
     existingSecret: ""  # Optional: name of pre-existing secret
 
-    # LiveKit room-level defaults (rendered under `room:` in config.yaml).
-    # All fields optional — the template applies LiveKit's own defaults when
-    # a field is unset.
-    room:
-      # Hard cap on participants per LiveKit room. Raise for large
-      # conferences (Element Call UI tolerates ~50). Each active participant
-      # adds CPU + egress bandwidth linearly on the SFU pod — bump the
-      # deployment's resources proportionally.
-      maxParticipants: 16
-      # Seconds to keep an empty LiveKit room open before auto-closing.
-      # Dropped to 30-60s for ephemeral-call scenarios, raised to 900+ for
-      # persistent meeting rooms.
-      emptyTimeout: 300
-      # Allow SFU to unmute other participants remotely (moderator actions).
-      enableRemoteUnmute: true
-
     # UDP LoadBalancer for WebRTC media (muxed mode = single UDP port for
     # all sessions via SCTP/DTLS). Much cheaper than a port range.
     service:
@@ -1279,12 +868,6 @@ rtc:
         # loadbalancer.ovhcloud.com/l4-protocol: udp
       loadBalancerIP: ""
       externalTrafficPolicy: Cluster  # Local preserves client IP but needs DSR support
-      # Public IP of the UDP LoadBalancer (ICE nat_1to1_ips). REQUIRED on OVH
-      # Managed Kubernetes (and any CNI where nodes sit behind a NAT'd LB) —
-      # use_external_ip returns the node IP via STUN instead of the LB IP,
-      # making ICE candidates unroutable. Leave empty only if your nodes have
-      # public IPs directly (K3s / bare metal).
-      publicIP: ""
       # external-dns hostname for the UDP endpoint.
       externalDns:
         enabled: false
