@@ -868,6 +868,14 @@ rtc:
         # loadbalancer.ovhcloud.com/l4-protocol: udp
       loadBalancerIP: ""
       externalTrafficPolicy: Cluster  # Local preserves client IP but needs DSR support
+      # Public IP advertised by LiveKit in ICE candidates. Required behind a
+      # cloud LoadBalancer (OVH MKS, AKS, GKE…) where the STUN lookup returns
+      # the K8s node IP instead of the LB IP, breaking ICE handshake for
+      # external clients. Set to the IP of the UDP LoadBalancer in front of
+      # LiveKit (kubectl get svc <release>-livekit-udp).
+      # Empty string ⇒ legacy behavior (use_external_ip=true via STUN), which
+      # works on K3s / bare-metal where nodes have public IPs.
+      publicIP: ""
       # external-dns hostname for the UDP endpoint.
       externalDns:
         enabled: false

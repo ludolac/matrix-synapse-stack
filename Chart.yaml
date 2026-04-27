@@ -2,7 +2,7 @@ apiVersion: v2
 name: matrix-synapse
 description: A Helm chart for deploying Matrix Synapse with Element Web and Coturn TURN server on Kubernetes
 type: application
-version: 1.8.2
+version: 3.0.0
 appVersion: "1.151.0"
 keywords:
   - matrix
@@ -39,3 +39,10 @@ annotations:
   # https://cloudnative-pg.io/documentation/current/installation_upgrade/
   artifacthub.io/prerequisites: |
     - CloudNativePG operator (required when postgresql.mode=cnpg, the default)
+  artifacthub.io/changes: |
+    - kind: changed
+      description: "Major version 3.0.0 — chart is now a streamlined fork of the 1.8.x line (no MAS / synapse-admin / PDB). The 2.x.x line (with MAS) remains available via the `2` git history branch and previous tags."
+    - kind: added
+      description: rtc.livekit.service.publicIP to override LiveKit's STUN-based IP detection (fix ICE handshake on OVH MKS / cloud LBs). Emits node_ip in the LiveKit config (LiveKit v1.11+ syntax).
+    - kind: removed
+      description: Matrix Authentication Service (MAS) integration and related templates (mas-*, synapse-admin-*, pdb.yaml). Synapse delegated auth (MSC3861) is no longer wired in 3.0.0.
