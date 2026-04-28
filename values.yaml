@@ -1274,8 +1274,13 @@ rtc:
       # critical for iOS Element X with E2EE).
       allowPause: true
       useSendSideBwe: true
-      # padding = pad with RTP padding packets for BWE probing.
-      probeMode: padding
+      # probe_mode is NOT in any released LiveKit version yet (latest stable
+      # is v1.11.0). The field exists only on upstream master. v1.11.x
+      # crashes at config load with "field probe_mode not found".
+      # Empty string (default) omits the field — safe for v1.11.x.
+      # Set to "padding" / "media" / "padding_and_media" only when running
+      # a custom build that includes the feature.
+      probeMode: ""
 
     # Optional DaemonSet that bumps net.core.rmem_max on every node, to work
     # around managed-Kubernetes restrictions on unsafe sysctls. Required for

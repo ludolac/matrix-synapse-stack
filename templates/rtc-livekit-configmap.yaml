@@ -52,7 +52,16 @@ data:
         enabled: {{ $cc.enabled | default true }}
         allow_pause: {{ $cc.allowPause | default true }}
         use_send_side_bwe: {{ $cc.useSendSideBwe | default true }}
-        probe_mode: {{ $cc.probeMode | default "padding" | quote }}
+        {{- with $cc.probeMode }}
+        # NOTE: probe_mode is NOT in any released LiveKit version yet
+        # (latest stable: v1.11.0, 2026-04-17). It exists only on upstream
+        # master/develop. Emitting it crashes v1.11.x at config load with
+        # "field probe_mode not found in type config.CongestionControlConfig".
+        # Set probeMode to a non-empty string in values.yaml only when running
+        # a custom build that includes the feature.
+        # Future-proof values when supported: "padding", "media", "padding_and_media".
+        probe_mode: {{ . | quote }}
+        {{- end }}
       {{- if and .Values.rtc.livekit.turn.enabled .Values.rtc.livekit.turn.reuseCoturn .Values.coturn.enabled }}
       # TURN fallback via the chart's existing coturn deployment (internal).
       # Clients behind symmetric NAT will relay through coturn.

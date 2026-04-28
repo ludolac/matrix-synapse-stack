@@ -2,7 +2,7 @@ apiVersion: v2
 name: matrix-synapse
 description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element Call, Coturn, CloudNativePG) on Kubernetes
 type: application
-version: 2.0.32
+version: 2.0.33
 appVersion: "1.151.0"
 keywords:
   - matrix
@@ -51,6 +51,10 @@ annotations:
   #   blocks are removed (they conflict with MSC3861). Admin creation moves to
   #   mas-cli. No in-place migration is provided — wipe + redeploy is expected.
   artifacthub.io/changes: |
+    - kind: fixed
+      description: "sysctlTuner DaemonSet: force decimal int rendering of rmemMax/wmemMax (Helm was emitting 7.5e+06 scientific notation, rejected by sysctl -w)"
+    - kind: fixed
+      description: "rtc.livekit.congestionControl.probeMode now optional — emitting it crashed LiveKit v1.11.0 (the field is not in any released LiveKit version, only on upstream master). Default empty string omits the field for backward compat."
     - kind: added
       description: "rtc.livekit.room.enabledCodecs (default H.264 first → iOS hardware accel + VP8 fallback for browsers)"
     - kind: added

@@ -37,8 +37,11 @@ spec:
             - -c
             - |
               set -eu
-              RMEM={{ .Values.rtc.livekit.sysctlTuner.rmemMax | default 7500000 }}
-              WMEM={{ .Values.rtc.livekit.sysctlTuner.wmemMax | default 7500000 }}
+              # NOTE: `int` is required to force a decimal representation;
+              # without it, Helm renders 7500000 as "7.5e+06" which `sysctl -w`
+              # rejects with "Invalid argument" (chart 2.0.32 regression).
+              RMEM={{ int (.Values.rtc.livekit.sysctlTuner.rmemMax | default 7500000) }}
+              WMEM={{ int (.Values.rtc.livekit.sysctlTuner.wmemMax | default 7500000) }}
               echo "Setting net.core.rmem_max=$RMEM"
               sysctl -w net.core.rmem_max=$RMEM
               echo "Setting net.core.wmem_max=$WMEM"
