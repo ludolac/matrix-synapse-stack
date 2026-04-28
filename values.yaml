@@ -367,7 +367,7 @@ element:
 
   image:
     repository: ghcr.io/element-hq/element-web
-    tag: "v1.12.15"
+    tag: "develop@sha256:0c1155965c42610cfc73d875173565355a588e3caf52e72f9a3fd1bad5744324"
     pullPolicy: IfNotPresent
 
   replicaCount: 2
