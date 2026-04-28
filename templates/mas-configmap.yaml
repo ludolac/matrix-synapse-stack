@@ -1,0 +1,150 @@
+{{- if .Values.mas.enabled }}
+{{- if not .Values.mas.existingSecret -}}
+{{- fail "mas.existingSecret is required. Generate it with scripts/generate-mas-secrets.sh." -}}
+{{- end -}}
+{{- if not .Values.mas.upstreamOauth2.providers -}}
+{{- fail "mas.upstreamOauth2.providers must contain at least one provider (e.g. Authelia). MAS is OIDC-only in this chart." -}}
+{{- end -}}
+{{- if not (hasSuffix "/" .Values.mas.publicUrl) -}}
+{{- fail (printf "mas.publicUrl must end with a trailing slash — got %q. MSC3861 uses the value as OAuth2 issuer and Synapse will reject tokens issued against an issuer without trailing slash." .Values.mas.publicUrl) -}}
+{{- end -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-mas-config
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mas
+data:
+  # This ConfigMap is a TEMPLATE, not the final config.
+  # Placeholders (${VAR}) are substituted at pod startup by the render-config
+  # init container (busybox+awk) using env vars sourced from:
+  #   - CNPG app Secret (DATABASE_PASSWORD)
+  #   - mas.existingSecret (ENCRYPTION_KEY, SIGNING_KEY_RSA_INDENTED,
+  #     SYNAPSE_CLIENT_SECRET, SYNAPSE_SHARED_SECRET, UPSTREAM_*_CLIENT_SECRET)
+  #
+  # Rationale: MAS does NOT apply Tera templating to config.yaml (only to HTML
+  # templates), so {{"{{"}} env(name='...') {{"}}"}} is treated as a literal string.
+  # We render ourselves, like Synapse and ess-helm do.
+  config.yaml: |
+    http:
+      listeners:
+        - name: web
+          resources:
+            - name: discovery
+            - name: human
+            - name: oauth
+            - name: compat
+            - name: graphql
+              playground: false
+            - name: assets
+            # /health endpoint hit by the Deployment's liveness & readiness
+            # probes — omitting this gets 404 and the pod never goes Ready.
+            - name: health
+            {{- if .Values.mas.adminApiEnabled }}
+            # Admin API used by Ketesa (and other admin UIs) to manage users,
+            # registration tokens, sessions. Off by default.
+            - name: adminapi
+            {{- end }}
+          binds:
+            - address: '[::]:8080'
+          proxy_protocol: false
+      public_base: {{ .Values.mas.publicUrl | quote }}
+      issuer: {{ .Values.mas.publicUrl | quote }}
+      trusted_proxies:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+
+    database:
+      uri: "postgresql://{{ .Values.postgresql.username }}:${DATABASE_PASSWORD}@{{ include "matrix-synapse.postgresql.host" . }}:{{ include "matrix-synapse.postgresql.port" . }}/{{ .Values.mas.database.name }}"
+
+    secrets:
+      encryption: "${ENCRYPTION_KEY}"
+      keys:
+        - kid: "rsa-1"
+          key: |
+            ${SIGNING_KEY_RSA}
+
+    matrix:
+      homeserver: {{ .Values.synapse.server.name | quote }}
+      secret: "${SYNAPSE_SHARED_SECRET}"
+      endpoint: "http://{{ include "matrix-synapse.fullname" . }}-synapse.{{ .Release.Namespace }}.svc.cluster.local"
+
+    clients:
+      # client_id must be exactly "0000000000000000000SYNAPSE" (18 zeros + SYNAPSE).
+      - client_id: "0000000000000000000SYNAPSE"
+        client_auth_method: client_secret_basic
+        client_secret: "${SYNAPSE_CLIENT_SECRET}"
+
+    upstream_oauth2:
+      providers:
+        {{- range $i, $provider := .Values.mas.upstreamOauth2.providers }}
+        - id: {{ $provider.id | quote }}
+          issuer: {{ $provider.issuer | quote }}
+          {{- with $provider.humanName }}
+          human_name: {{ . | quote }}
+          {{- end }}
+          client_id: {{ $provider.clientId | quote }}
+          {{- /* Placeholder key defaults to UPSTREAM_<ID>_CLIENT_SECRET (upper-cased) */ -}}
+          {{- $envKey := $provider.clientSecretKey | default (printf "UPSTREAM_%s_CLIENT_SECRET" (upper $provider.id)) }}
+          client_secret: "${{"{"}}{{ $envKey }}{{"}"}}"
+          token_endpoint_auth_method: {{ $provider.tokenEndpointAuthMethod | default "client_secret_basic" | quote }}
+          scope: {{ $provider.scope | default "openid profile email" | quote }}
+          claims_imports:
+            {{- $claims := $provider.claimsImports | default dict }}
+            subject:
+              action: require
+              template: {{ $claims.subject | default "{{ user.sub }}" | quote }}
+            localpart:
+              action: require
+              template: {{ $claims.localpart | default "{{ user.preferred_username }}" | quote }}
+            displayname:
+              action: suggest
+              template: {{ $claims.displayname | default "{{ user.name }}" | quote }}
+            email:
+              action: suggest
+              template: {{ $claims.email | default "{{ user.email }}" | quote }}
+        {{- end }}
+
+    # Enable the local password auth subsystem only when password registration
+    # is on — otherwise MAS complains about a password backend without users.
+    passwords:
+      enabled: {{ .Values.mas.account.passwordRegistrationEnabled }}
+
+    account:
+      password_registration_enabled: {{ .Values.mas.account.passwordRegistrationEnabled }}
+      password_registration_email_required: {{ .Values.mas.account.passwordRegistrationEmailRequired }}
+      registration_token_required: {{ .Values.mas.account.registrationTokenRequired }}
+      login_with_email_allowed: {{ .Values.mas.account.loginWithEmailAllowed }}
+
+    {{- if .Values.mas.email.hostname }}
+    # Only emitted when a relay hostname is configured — otherwise MAS falls
+    # back to its default "no email backend" mode (password reset, registration
+    # tokens, verification mails will silently not be sent).
+    email:
+      from: {{ .Values.mas.email.from | quote }}
+      reply_to: {{ .Values.mas.email.replyTo | default .Values.mas.email.from | quote }}
+      transport: {{ .Values.mas.email.transport | default "smtp" | quote }}
+      mode: {{ .Values.mas.email.mode | default "plain" | quote }}
+      hostname: {{ .Values.mas.email.hostname | quote }}
+      port: {{ .Values.mas.email.port | default 587 }}
+      {{- if .Values.mas.email.username }}
+      username: {{ .Values.mas.email.username | quote }}
+      # Password can be inline (dev) or a `${EMAIL_PASSWORD}` placeholder
+      # substituted from mas.existingSecret by the render-config init container.
+      password: {{ .Values.mas.email.password | quote }}
+      {{- end }}
+    {{- end }}
+
+    branding:
+      service_name: "Matrix"
+
+    telemetry:
+      tracing:
+        exporter: none
+      metrics:
+        exporter: prometheus
+        binds:
+          - address: '[::]:9090'
+{{- end }}

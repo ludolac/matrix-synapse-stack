@@ -1,0 +1,30 @@
+{{- if .Values.synapseAdmin.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-synapse-admin
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: synapse-admin
+  annotations:
+    {{- with .Values.synapseAdmin.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.synapseAdmin.ingress.className }}
+  tls:
+    - hosts:
+        - {{ .Values.synapseAdmin.ingress.host }}
+      secretName: {{ .Values.synapseAdmin.ingress.tls.secretName }}
+  rules:
+    - host: {{ .Values.synapseAdmin.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "matrix-synapse.fullname" . }}-synapse-admin
+                port:
+                  number: 80
+{{- end }}

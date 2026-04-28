@@ -44,6 +44,14 @@ data:
         cp_min: {{ .Values.synapse.database.cpMin }}
         cp_max: {{ .Values.synapse.database.cpMax }}
 
+    {{- if .Values.mas.enabled }}
+    # Registration is delegated to MAS (user creation happens implicitly on
+    # first upstream OIDC login). The Synapse-side registration flags are
+    # disabled to keep them consistent with MSC3861 semantics.
+    enable_registration: false
+    enable_registration_without_verification: false
+    allow_guest_access: false
+    {{- else }}
     # Registration
     enable_registration: {{ .Values.synapse.server.registration.enabled }}
     enable_registration_without_verification: false
@@ -61,6 +69,7 @@ data:
     # This is required for the register_new_matrix_user command
     # Value is injected from REGISTRATION_SHARED_SECRET environment variable
     registration_shared_secret: "${REGISTRATION_SHARED_SECRET}"
+    {{- end }}
     {{- end }}
 
     # Media storage
@@ -93,6 +102,12 @@ data:
       - 'ff00::/8'         # IPv6 multicast
       - 'fec0::/10'        # IPv6 site-local (deprecated)
     max_spider_size: 10M  # Maximum size of content to download for previews
+    {{- end }}
+
+    {{- with .Values.synapse.server.roomListPublicationRules }}
+    # Who can publish rooms into the public directory (ordered rule list).
+    room_list_publication_rules:
+      {{- toYaml . | nindent 6 }}
     {{- end }}
 
     # TURN server configuration
@@ -139,6 +154,12 @@ data:
       require_transport_security: {{ .Values.synapse.server.email.requireTransportSecurity }}
       notif_from: "{{ .Values.synapse.server.email.notifFrom }}"
       app_name: "{{ .Values.synapse.server.email.appName }}"
+      {{- if .Values.synapse.server.email.clientBaseUrl }}
+      # Public URL of the Element Web instance. Used in room-invite emails so
+      # links open in the self-hosted client instead of the default
+      # https://app.element.io.
+      client_base_url: "{{ .Values.synapse.server.email.clientBaseUrl }}"
+      {{- end }}
     {{- end }}
 
     # Report stats
@@ -157,16 +178,58 @@ data:
     # Suppress key server warnings
     suppress_key_server_warning: true
 
-    {{- if .Values.rtc.enabled }}
-    # MatrixRTC (Element Call group calls) prerequisites
-    # MSC3266: room summary API (knocking to join public calls)
-    # MSC4140: delayed events (critical — without it, call leave events are
-    #          lost and stuck calls happen)
+    {{- if or .Values.rtc.enabled .Values.mas.enabled }}
+    # Experimental MSCs. Merged across features (MatrixRTC, MAS delegated auth).
     experimental_features:
+      {{- if .Values.rtc.enabled }}
+      # MatrixRTC (Element Call group calls): room summary + delayed events.
       msc3266_enabled: true
       msc4140_enabled: true
+      # MSC4143: server-advertised RTC transports (clients call
+      # /_matrix/client/unstable/org.matrix.msc4143/rtc/transports to discover
+      # the SFU). Without this, calls "connect" but get terminated after 15-30s
+      # because the client can't negotiate the transport. See synapse#19621.
+      msc4143_enabled: true
+      {{- end }}
+      {{- if .Values.mas.enabled }}
+      # MSC3861: delegated authentication via Matrix Authentication Service.
+      # Disables all local auth (password, OIDC, registration_shared_secret) —
+      # Synapse acts as a pure OAuth2 resource server, tokens are minted by MAS.
+      msc3861:
+        enabled: true
+        issuer: {{ .Values.mas.publicUrl | quote }}
+        account_management_url: "{{ .Values.mas.publicUrl | trimSuffix "/" }}/account"
+        # Synapse identifies itself to MAS with this fixed client_id.
+        client_id: "0000000000000000000SYNAPSE"
+        client_auth_method: client_secret_basic
+        client_secret: "${SYNAPSE_MAS_CLIENT_SECRET}"
+        admin_token: "${SYNAPSE_MAS_SHARED_SECRET}"
+      {{- if .Values.mas.qrCodeLoginEnabled }}
+      # MSC4108: device-to-device QR code sign-in (Element X / Element Web).
+      # Only makes sense with MAS: the new client authenticates via a secure
+      # out-of-band channel that reuses the MSC3861 OAuth2 token issuance.
+      # Without this, clients display "QR code not supported".
+      msc4108_enabled: true
+      {{- end }}
+      {{- end }}
+    {{- if .Values.rtc.enabled }}
     # Maximum lifetime for a delayed event (keep calls from leaking forever)
     max_event_delay_duration: 24h
+
+    # MSC4143 server-side transport advertisement. Matches the well-known
+    # `org.matrix.msc4143.rtc_foci` entry — Synapse serves the same list
+    # to authenticated clients via /_matrix/client/unstable/.../rtc/transports.
+    # Override by setting .Values.synapse.server.matrixRtc.transports to a
+    # custom list; otherwise auto-derived from rtc.ingress.backend.host.
+    matrix_rtc:
+      transports:
+        {{- with .Values.synapse.server.matrixRtc.transports }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
+        - type: livekit
+          livekit_service_url: "https://{{ .Values.rtc.ingress.backend.host }}/livekit/jwt"
+        {{- end }}
+    {{- end }}
     {{- end }}
 
     {{- if .Values.synapse.server.mfa }}
@@ -209,8 +272,8 @@ data:
     {{- end }}
     {{- end }}
 
-    {{- if .Values.synapse.server.sso.enabled }}
-    # SSO Configuration
+    {{- if and .Values.synapse.server.sso.enabled (not .Values.mas.enabled) }}
+    # SSO Configuration (legacy path — MAS replaces this when mas.enabled=true)
     {{- if .Values.synapse.server.sso.oidc.enabled }}
     # OpenID Connect (OIDC) providers
     oidc_providers:

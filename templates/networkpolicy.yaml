@@ -50,6 +50,17 @@ spec:
       ports:
         - protocol: TCP
           port: 8008
+    {{- if .Values.mas.enabled }}
+    # Allow from MAS (calls Synapse admin/client API via MSC3861)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: mas
+      ports:
+        - protocol: TCP
+          port: 8008
+    {{- end }}
     # Allow metrics scraping
     {{- if .Values.synapse.metrics.enabled }}
     - from:

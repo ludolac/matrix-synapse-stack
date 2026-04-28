@@ -51,16 +51,16 @@ This production-ready Helm chart simplifies the deployment of Matrix Synapse on 
 |-----------|--------|----------|----------|------|--------|-----|
 | **Configuration** | ![Status](https://img.shields.io/badge/status-scanned-success) | Daily at 2AM UTC | ![Critical](https://img.shields.io/badge/critical-0-success) | ![High](https://img.shields.io/badge/high-3-important) | ![Medium](https://img.shields.io/badge/medium-6-orange) | ![Low](https://img.shields.io/badge/low-16-informational) |
 | **Helm Manifests** | ![Status](https://img.shields.io/badge/status-scanned-success) | On every push | ![Critical](https://img.shields.io/badge/critical-0-success) | ![High](https://img.shields.io/badge/high-3-important) | ![Medium](https://img.shields.io/badge/medium-6-orange) | ![Low](https://img.shields.io/badge/low-16-informational) |
-| **Container Images** | ![Status](https://img.shields.io/badge/status-scanned-success) | Daily + On Push | ![Critical](https://img.shields.io/badge/critical-11-critical) | ![High](https://img.shields.io/badge/high-90-important) | ![Medium](https://img.shields.io/badge/medium-215-orange) | ![Low](https://img.shields.io/badge/low-299-informational) |
+| **Container Images** | ![Status](https://img.shields.io/badge/status-scanned-success) | Daily + On Push | ![Critical](https://img.shields.io/badge/critical-11-critical) | ![High](https://img.shields.io/badge/high-88-important) | ![Medium](https://img.shields.io/badge/medium-206-orange) | ![Low](https://img.shields.io/badge/low-299-informational) |
 
 ### Container Images Scanned
 
 | Image | Version | Critical | High | Medium | Low |
 |-------|---------|----------|------|--------|-----|
-| **Synapse** | v1.151.0 | [![Critical](https://img.shields.io/badge/critical-4-critical)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) | [![High](https://img.shields.io/badge/high-31-important)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) | [![Medium](https://img.shields.io/badge/medium-70-orange)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) | [![Low](https://img.shields.io/badge/low-111-informational)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) |
-| **Element Web** | v1.12.15 | [![Critical](https://img.shields.io/badge/critical-2-critical)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) | [![High](https://img.shields.io/badge/high-11-important)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) | [![Medium](https://img.shields.io/badge/medium-5-orange)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) | [![Low](https://img.shields.io/badge/low-2-informational)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) |
-| **PostgreSQL** | 17.9 | [![Critical](https://img.shields.io/badge/critical-5-critical)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) | [![High](https://img.shields.io/badge/high-48-important)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) | [![Medium](https://img.shields.io/badge/medium-140-orange)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) | [![Low](https://img.shields.io/badge/low-186-informational)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) |
-| **Coturn** | 4.10-alpine | [![Critical](https://img.shields.io/badge/critical-0-success)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) | [![High](https://img.shields.io/badge/high-0-success)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) | [![Medium](https://img.shields.io/badge/medium-0-success)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) | [![Low](https://img.shields.io/badge/low-0-informational)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) |
+| **Synapse** | v1.151.0 | [![Critical](https://img.shields.io/badge/critical-4-critical)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) | [![High](https://img.shields.io/badge/high-30-important)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) | [![Medium](https://img.shields.io/badge/medium-68-orange)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) | [![Low](https://img.shields.io/badge/low-111-informational)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) |
+| **Element Web** | v1.12.15 | [![Critical](https://img.shields.io/badge/critical-2-critical)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) | [![High](https://img.shields.io/badge/high-11-important)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) | [![Medium](https://img.shields.io/badge/medium-5-orange)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) | [![Low](https://img.shields.io/badge/low-2-informational)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) |
+| **PostgreSQL** | 17.9 | [![Critical](https://img.shields.io/badge/critical-5-critical)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) | [![High](https://img.shields.io/badge/high-47-important)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) | [![Medium](https://img.shields.io/badge/medium-133-orange)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) | [![Low](https://img.shields.io/badge/low-186-informational)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) |
+| **Coturn** | 4.10-alpine | [![Critical](https://img.shields.io/badge/critical-0-success)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) | [![High](https://img.shields.io/badge/high-0-success)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) | [![Medium](https://img.shields.io/badge/medium-0-success)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) | [![Low](https://img.shields.io/badge/low-0-informational)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) |
 
 ### Security Features
 
@@ -174,7 +174,7 @@ This production-ready Helm chart simplifies the deployment of Matrix Synapse on 
 | **CloudNativePG operator** | v1.22+ | ✅ Yes (default) | HA PostgreSQL via `postgresql.mode=cnpg` | Not required for `standalone` or `external` mode |
 | **external-dns** | v0.13+ | ⚙️ Optional | Automatic DNS management | Automates DNS record creation |
 | **Prometheus** | v2.40+ | ⚙️ Optional | Metrics collection | For monitoring and alerting |
-| **PostgreSQL** | 17.9 | [![Critical](https://img.shields.io/badge/critical-5-critical)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) | [![High](https://img.shields.io/badge/high-48-important)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) | [![Medium](https://img.shields.io/badge/medium-140-orange)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) | [![Low](https://img.shields.io/badge/low-186-informational)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24986840880) |
+| **PostgreSQL** | 17.9 | [![Critical](https://img.shields.io/badge/critical-5-critical)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) | [![High](https://img.shields.io/badge/high-47-important)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) | [![Medium](https://img.shields.io/badge/medium-133-orange)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) | [![Low](https://img.shields.io/badge/low-186-informational)](https://github.com/ludolac/matrix-synapse-stack/actions/runs/24874905461) |
 
 #### CloudNativePG operator
 
@@ -1165,6 +1165,110 @@ See full Coturn documentation in original README for advanced configuration.
 
 ---
 
+## Matrix Authentication Service (MAS)
+
+MSC3861 delegated authentication via [Matrix Authentication Service](https://github.com/element-hq/matrix-authentication-service).
+Disabled by default — enable with `mas.enabled: true`.
+
+### What it unlocks
+
+- **QR code sign-in** on Element / ElementX (impossible without MSC3861)
+- Native OAuth2 / OIDC flow — users authenticate via your upstream IdP (Authelia)
+- Account Management UI at `https://<mas.ingress.host>/account`
+- Compatibility with ElementX and future Matrix clients that drop legacy auth
+
+### Components deployed when `mas.enabled=true`
+
+| Component | Image | Port | Purpose |
+|-----------|-------|------|---------|
+| MAS server | `ghcr.io/element-hq/matrix-authentication-service:1.15.0` | TCP 8080 (HTTP), 9090 (metrics) | Authentication backend |
+| CNPG Database `mas_prod` | — | — | Dedicated DB inside the chart's CNPG cluster |
+
+Synapse is automatically reconfigured: MSC3861 is enabled, the legacy
+`password_config` / `oidc_providers` / `registration_shared_secret` blocks are
+removed, `org.matrix.msc2965.authentication` is advertised in
+`.well-known/matrix/client`, and Element Web's `feature_oidc_native_flow` is
+enabled.
+
+### Bootstrap (fresh install, no syn2mas migration)
+
+1. **Generate MAS secrets** and create the Kubernetes Secret:
+
+```bash
+./scripts/generate-mas-secrets.sh \
+  --namespace matrix \
+  --name matrix-synapse-mas-secrets \
+  --authelia-secret matrix-synapse-sso-credentials
+```
+
+2. **Update Authelia** to accept the new redirect URI. On your existing
+   `matrix` OIDC client, add (keep `client_id` and `client_secret` unchanged).
+   Pick a dedicated hostname for MAS (e.g. `mas.<domain>`) — **do not reuse
+   the hostname of your Authelia**, both services need their own Ingress.
+   ```yaml
+   redirect_uris:
+     - https://mas.waadoo.ovh/upstream/callback/authelia
+   ```
+
+3. **Values** (Authelia stays at `auth.waadoo.ovh`, MAS gets `mas.waadoo.ovh`):
+   ```yaml
+   mas:
+     enabled: true
+     publicUrl: "https://mas.waadoo.ovh/"
+     existingSecret: matrix-synapse-mas-secrets
+     ingress:
+       host: mas.waadoo.ovh
+       tls:
+         secretName: matrix-mas-tls
+     upstreamOauth2:
+       providers:
+         - id: authelia
+           humanName: "Waadoo SSO"
+           issuer: https://auth.waadoo.ovh    # your existing Authelia
+           clientId: matrix
+           clientSecretKey: UPSTREAM_AUTHELIA_CLIENT_SECRET
+           scope: "openid profile email"
+   ```
+
+4. **Deploy**. Synapse will start in MSC3861 mode.
+
+5. **Create the admin user**:
+   - Log in once via Element Web with your Authelia account (MAS creates the user)
+   - Promote:
+     ```bash
+     kubectl exec -n matrix deploy/matrix-synapse-mas -- \
+       mas-cli manage set-admin <localpart> --admin
+     ```
+
+### Troubleshooting
+
+```bash
+# Check that well-known advertises MSC2965
+curl https://matrix.waadoo.ovh/.well-known/matrix/client | \
+  jq '."org.matrix.msc2965.authentication"'
+
+# MAS health
+curl https://mas.waadoo.ovh/health
+
+# Synapse logs (should confirm MSC3861 active)
+kubectl logs -n matrix deploy/matrix-synapse-synapse --tail=50 | grep -i mas
+
+# MAS logs
+kubectl logs -n matrix deploy/matrix-synapse-mas --tail=100
+```
+
+Common issues:
+- **Synapse fails with "cannot connect to MAS"** → `SYNAPSE_CLIENT_SECRET` in
+  the MAS secret doesn't match what Synapse reads. Regenerate via
+  `./scripts/generate-mas-secrets.sh`.
+- **Authelia returns `redirect_uri mismatch`** → add
+  `https://<mas.ingress.host>/upstream/callback/<provider.id>` to Authelia's
+  client config.
+- **Users can't log in after enabling MAS** → legacy auth is disabled. This
+  chart does **not** run syn2mas (design choice — dev deployments wipe + redeploy).
+
+---
+
 ## MatrixRTC / Element Call (Group Video Calls)
 
 Native Matrix group calls using the LiveKit SFU backend, compliant with
@@ -1625,7 +1729,7 @@ This Helm chart is licensed under the **MIT License** - see [LICENSE](LICENSE) f
 
 ## Chart Information
 
-- **Chart Version**: 1.8.0
+- **Chart Version**: 2.0.0
 - **Synapse Version**: v1.151.0
 - **Element Web Version**: v1.12.15
 - **PostgreSQL Version**: 17 (`ghcr.io/cloudnative-pg/postgresql:17.9` in CNPG mode, `postgres:17-alpine` in standalone mode)
@@ -1635,5 +1739,17 @@ This Helm chart is licensed under the **MIT License** - see [LICENSE](LICENSE) f
   - LiveKit SFU: `livekit/livekit-server:v1.11.0`
   - lk-jwt-service: `ghcr.io/element-hq/lk-jwt-service:0.4.4`
   - Element Call: `ghcr.io/element-hq/element-call:v0.19.1`
+- **Matrix Authentication Service (opt-in via `mas.enabled=true`)**:
+  - MAS: `ghcr.io/element-hq/matrix-authentication-service:1.15.0`
+
+### Breaking changes in 2.0.0
+
+- New top-level `mas:` section. When `mas.enabled=true`, Synapse drops its
+  legacy `oidc_providers` / `password_config` / `registration_shared_secret`
+  (replaced by MSC3861 delegated auth).
+- Admin user creation moves from `register_new_matrix_user` to
+  `mas-cli manage set-admin`. The `admin-user-job` template is skipped when
+  `mas.enabled=true`.
+- No in-chart syn2mas migration (intentional — targets fresh dev deployments).
 
 **Maintainer**: WAADOO - contact@waadoo.ovh

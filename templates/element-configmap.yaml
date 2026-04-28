@@ -47,14 +47,17 @@ data:
         "feature_group_calls": "enable",
         "feature_video_rooms": "enable",
         "feature_element_call_video_rooms": "enable"
+        {{- end }}{{- if .Values.mas.enabled }},
+        "feature_oidc_native_flow": "enable"
         {{- end }}
       },
       {{- if .Values.rtc.enabled }}
+      {{- $ec := .Values.element.config.elementCall | default dict }}
       "element_call": {
         "url": "https://{{ .Values.rtc.ingress.call.host }}",
-        "use_exclusively": false,
-        "participant_limit": 8,
-        "brand": "Element Call"
+        "use_exclusively": {{ $ec.useExclusively | default false }},
+        "participant_limit": {{ $ec.participantLimit | default 8 }},
+        "brand": "{{ $ec.brand | default "Element Call" }}"
       },
       {{- end }}
       "jitsi": {

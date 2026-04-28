@@ -24,15 +24,17 @@ data:
       port_range_start: 0
       port_range_end: 0
       {{- if .Values.rtc.livekit.service.publicIP }}
-      # Static public IP override (chart 1.8.4+) — bypasses STUN lookup
-      # which is unreliable behind cloud LoadBalancers (OVH MKS, AKS, GKE…)
-      # where STUN returns the node IP instead of the LB IP.
-      # NOTE: LiveKit v1.11+ requires `node_ip` (string), not `nat_1to1_ips`
-      # (list) — the field was renamed and old syntax is rejected at boot.
+      # Force the advertised IP in ICE candidates (LiveKit v1.11+).
+      # On OVH Managed Kubernetes (and other CNIs where nodes sit behind a LB
+      # with SNAT), `use_external_ip: true` learns the NODE IP via STUN, not
+      # the LB IP — ICE candidates reference an unroutable address and
+      # WebRTC connectivity fails.
+      # NOTE: the config key is `node_ip` (single string) in LiveKit v1.11+.
+      # `nat_1to1_ips` from older LiveKit versions is rejected at config load.
       node_ip: {{ .Values.rtc.livekit.service.publicIP | quote }}
       {{- else }}
-      # Needed when running behind a LoadBalancer: announce the public IP
-      # in ICE candidates so clients can reach the SFU.
+      # STUN-based public IP discovery. Works on flat networks (node has a
+      # public IP) but breaks behind a NAT LoadBalancer — use publicIP instead.
       use_external_ip: true
       {{- end }}
       # ICE-Lite: SFU does not act as full ICE agent, simplifies NAT in SFU
@@ -59,11 +61,16 @@ data:
       json: false
 
     # Room settings
+    {{- $room := .Values.rtc.livekit.room | default dict }}
     room:
       auto_create: false           # Let lk-jwt-service authorize room creation
-      enable_remote_unmute: true
-      max_participants: 16         # Element Call default cap
-      empty_timeout: 300           # 5 min after last participant leaves
+      enable_remote_unmute: {{ $room.enableRemoteUnmute | default true }}
+      # max_participants is a HARD cap enforced by the SFU. Raise when running
+      # large conferences (Element Call's default UI caps at ~50). Each active
+      # participant adds CPU + bandwidth load linearly on the SFU pod.
+      max_participants: {{ $room.maxParticipants | default 16 }}
+      # Seconds to keep an empty LiveKit room open before auto-closing.
+      empty_timeout: {{ $room.emptyTimeout | default 300 }}
 
     # Note: livekit-server does not accept a top-level `health:` block.
     # Health is always served on the signaling port (HTTP GET / returns 200).

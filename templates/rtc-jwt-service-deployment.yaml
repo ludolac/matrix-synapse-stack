@@ -34,9 +34,12 @@ spec:
           imagePullPolicy: {{ .Values.rtc.jwtService.image.pullPolicy }}
           env:
             - name: LIVEKIT_URL
-              # Internal signaling URL (Traefik ingress is not needed for
-              # intra-cluster comms; keep path clean for routing).
-              value: "ws://{{ include "matrix-synapse.fullname" . }}-livekit.{{ .Release.Namespace }}.svc.cluster.local:7880"
+              # Public WSS URL embedded in the JWT returned to clients
+              # (Element / ElementX). The client connects *directly* to this
+              # URL from outside the cluster, so it MUST be publicly reachable
+              # — an internal svc.cluster.local address would fail with
+              # ERR_NAME_NOT_RESOLVED and the LiveKit room would time out empty.
+              value: "wss://{{ .Values.rtc.ingress.backend.host }}/livekit/sfu"
             - name: LIVEKIT_KEY
               valueFrom:
                 secretKeyRef:

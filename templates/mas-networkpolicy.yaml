@@ -1,0 +1,101 @@
+{{- if and .Values.mas.enabled .Values.networkPolicy.enabled }}
+# NetworkPolicy for Matrix Authentication Service.
+# Covers:
+#   ingress:
+#     - Traefik (OAuth2 endpoints + Account Management UI, port 8080)
+#     - Metrics scraping from any namespace (port 9090)
+#   egress:
+#     - Synapse (admin API over MSC3861, port 8008)
+#     - PostgreSQL (CNPG cluster or standalone, port 5432)
+#     - DNS (kube-system, TCP+UDP 53)
+#     - External HTTPS (upstream OIDC providers — Authelia, etc.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-mas
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mas
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: mas
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Traefik → MAS
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingress.traefik.namespaceSelector | nindent 14 }}
+        {{- if .Values.networkPolicy.ingress.traefik.podSelector }}
+        - podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingress.traefik.podSelector | nindent 14 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Prometheus metrics
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 9090
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # MAS → Synapse (MSC3861 admin API)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: synapse
+      ports:
+        - protocol: TCP
+          port: 8008
+    # MAS → PostgreSQL (selector depends on postgresql.mode)
+    {{- $pgMode := .Values.postgresql.mode | default "cnpg" }}
+    {{- if eq $pgMode "cnpg" }}
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: {{ include "matrix-synapse.postgresql.cnpgClusterName" . }}
+      ports:
+        - protocol: TCP
+          port: 5432
+    {{- else if eq $pgMode "standalone" }}
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    {{- end }}
+    # HTTPS to upstream OIDC providers (Authelia, etc.) — internet + internal.
+    - ports:
+        - protocol: TCP
+          port: 443
+    {{- if .Values.mas.email.hostname }}
+    # MAS → SMTP server (email verification for password registration and
+    # password reset). Mirrors the pattern used by Synapse's NetworkPolicy
+    # for `synapse.server.email.enabled`.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.mas.email.port | default 587 }}
+    {{- end }}
+{{- end }}

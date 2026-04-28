@@ -6,7 +6,7 @@ metadata:
     {{- include "matrix-synapse.labels" . | nindent 4 }}
     app.kubernetes.io/component: wellknown
 spec:
-  replicas: 2
+  replicas: {{ .Values.wellknown.replicaCount }}
   selector:
     matchLabels:
       {{- include "matrix-synapse.selectorLabels" . | nindent 6 }}
@@ -23,8 +23,8 @@ spec:
         fsGroup: 101
       containers:
         - name: nginx
-          image: nginx:1.25-alpine
-          imagePullPolicy: IfNotPresent
+          image: "{{ .Values.wellknown.image.repository }}:{{ .Values.wellknown.image.tag }}"
+          imagePullPolicy: {{ .Values.wellknown.image.pullPolicy }}
           ports:
             - name: http
               containerPort: 8080
@@ -41,12 +41,7 @@ spec:
             - name: nginx-run
               mountPath: /var/run
           resources:
-            requests:
-              cpu: 10m
-              memory: 16Mi
-            limits:
-              cpu: 100m
-              memory: 64Mi
+            {{- toYaml .Values.wellknown.resources | nindent 12 }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

@@ -1,0 +1,36 @@
+{{- if .Values.synapseAdmin.enabled }}
+{{- /* Auto-default externalAuthProvider to mas.enabled unless user overrides. */ -}}
+{{- $extAuth := .Values.synapseAdmin.externalAuthProvider }}
+{{- if eq (printf "%v" $extAuth) "<nil>" }}
+{{- $extAuth = .Values.mas.enabled }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-synapse-admin-config
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: synapse-admin
+data:
+  # synapse-admin (etkecc) reads /var/public/config.json at page load.
+  # Schema docs: https://github.com/etkecc/synapse-admin/blob/main/docs/config.md
+  config.json: |
+    {
+      {{- if .Values.synapseAdmin.restrictBaseUrl }}
+      {{- if kindIs "slice" .Values.synapseAdmin.restrictBaseUrl }}
+      "restrictBaseUrl": {{ .Values.synapseAdmin.restrictBaseUrl | toJson }},
+      {{- else }}
+      "restrictBaseUrl": {{ .Values.synapseAdmin.restrictBaseUrl | quote }},
+      {{- end }}
+      {{- end }}
+      "externalAuthProvider": {{ $extAuth }},
+      "corsCredentials": {{ .Values.synapseAdmin.corsCredentials | quote }},
+      {{- with .Values.synapseAdmin.asManagedUsers }}
+      "asManagedUsers": {{ . | toJson }},
+      {{- end }}
+      {{- with .Values.synapseAdmin.menu }}
+      "menu": {{ . | toJson }},
+      {{- end }}
+      "wellKnownDiscovery": true
+    }
+{{- end }}

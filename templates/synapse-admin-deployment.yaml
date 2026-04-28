@@ -1,0 +1,85 @@
+{{- if .Values.synapseAdmin.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-synapse-admin
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: synapse-admin
+spec:
+  replicas: {{ .Values.synapseAdmin.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "matrix-synapse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: synapse-admin
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/synapse-admin-configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "matrix-synapse.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: synapse-admin
+    spec:
+      serviceAccountName: {{ include "matrix-synapse.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.synapseAdmin.podSecurityContext | nindent 8 }}
+      containers:
+        - name: synapse-admin
+          securityContext:
+            {{- toYaml .Values.synapseAdmin.securityContext | nindent 12 }}
+          image: "{{ .Values.synapseAdmin.image.repository }}:{{ .Values.synapseAdmin.image.tag }}"
+          imagePullPolicy: {{ .Values.synapseAdmin.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.synapseAdmin.resources | nindent 12 }}
+          volumeMounts:
+            # Mount the config.json where the nginx-served SPA looks for it.
+            - name: config
+              mountPath: /var/public/config.json
+              subPath: config.json
+              readOnly: true
+            # nginx needs writable tmp + cache paths under readOnlyRootFilesystem.
+            - name: tmp
+              mountPath: /tmp
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "matrix-synapse.fullname" . }}-synapse-admin-config
+        - name: tmp
+          emptyDir: {}
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}
+      {{- with .Values.synapseAdmin.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.synapseAdmin.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.synapseAdmin.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
