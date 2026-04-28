@@ -40,6 +40,19 @@ data:
       # ICE-Lite: SFU does not act as full ICE agent, simplifies NAT in SFU
       # deployments where clients initiate the connection.
       use_ice_lite: true
+      # Application-level packet buffer (independent from kernel rmem). Larger
+      # buffer absorbs bursts when kernel rmem is throttled (OVH MKS limits
+      # net.core.rmem_max to ~425KB). Default LiveKit: 500/200.
+      packet_buffer_size_video: {{ .Values.rtc.livekit.packetBufferSizeVideo | default 1000 }}
+      packet_buffer_size_audio: {{ .Values.rtc.livekit.packetBufferSizeAudio | default 400 }}
+      # Bandwidth estimation + dynacast. allow_pause lets the SFU pause
+      # simulcast layers nobody subscribes to → less CPU on iOS publishers.
+      {{- $cc := .Values.rtc.livekit.congestionControl | default dict }}
+      congestion_control:
+        enabled: {{ $cc.enabled | default true }}
+        allow_pause: {{ $cc.allowPause | default true }}
+        use_send_side_bwe: {{ $cc.useSendSideBwe | default true }}
+        probe_mode: {{ $cc.probeMode | default "padding" | quote }}
       {{- if and .Values.rtc.livekit.turn.enabled .Values.rtc.livekit.turn.reuseCoturn .Values.coturn.enabled }}
       # TURN fallback via the chart's existing coturn deployment (internal).
       # Clients behind symmetric NAT will relay through coturn.
@@ -71,6 +84,20 @@ data:
       max_participants: {{ $room.maxParticipants | default 16 }}
       # Seconds to keep an empty LiveKit room open before auto-closing.
       empty_timeout: {{ $room.emptyTimeout | default 300 }}
+      # Codec ordering. Lists H.264 first to favour iOS hardware encode/decode
+      # (saves CPU on Element X mobile, especially with E2EE Insertable Streams);
+      # VP8 second for browser compatibility (Firefox lacks H.264 in many builds).
+      # Override via .Values.rtc.livekit.room.enabledCodecs.
+      # WARNING: do not list H.264 alone — breaks Firefox (livekit#3404).
+      enabled_codecs:
+        {{- with $room.enabledCodecs }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
+        - mime: video/h264
+        - mime: video/vp8
+        - mime: audio/opus
+        - mime: audio/red
+        {{- end }}
 
     # Note: livekit-server does not accept a top-level `health:` block.
     # Health is always served on the signaling port (HTTP GET / returns 200).

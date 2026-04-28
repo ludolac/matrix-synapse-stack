@@ -1,0 +1,62 @@
+{{- if and .Values.rtc.enabled .Values.rtc.livekit.sysctlTuner.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-livekit-sysctl-tuner
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: livekit-sysctl-tuner
+  annotations:
+    matrix-synapse.chart/description: |
+      Privileged DaemonSet that bumps net.core.rmem_max / wmem_max on every
+      node so LiveKit (running as a regular pod) inherits a UDP receive
+      buffer >= 5MB. Required workaround when the kubelet does not allow
+      unsafe sysctls (OVH MKS, GKE, EKS managed nodepools).
+spec:
+  selector:
+    matchLabels:
+      {{- include "matrix-synapse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: livekit-sysctl-tuner
+  template:
+    metadata:
+      labels:
+        {{- include "matrix-synapse.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: livekit-sysctl-tuner
+    spec:
+      hostNetwork: true
+      hostPID: true
+      tolerations:
+        - operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: sysctl-tuner
+          image: {{ .Values.rtc.livekit.sysctlTuner.image | default "busybox:1.37" | quote }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              RMEM={{ .Values.rtc.livekit.sysctlTuner.rmemMax | default 7500000 }}
+              WMEM={{ .Values.rtc.livekit.sysctlTuner.wmemMax | default 7500000 }}
+              echo "Setting net.core.rmem_max=$RMEM"
+              sysctl -w net.core.rmem_max=$RMEM
+              echo "Setting net.core.wmem_max=$WMEM"
+              sysctl -w net.core.wmem_max=$WMEM
+              # Re-apply periodically in case of node-level reset (kubelet
+              # restart, sysctl conflicts with another DaemonSet, etc.).
+              while true; do
+                sleep 3600
+                sysctl -w net.core.rmem_max=$RMEM >/dev/null
+                sysctl -w net.core.wmem_max=$WMEM >/dev/null
+              done
+          securityContext:
+            privileged: true
+          resources:
+            limits:
+              cpu: 50m
+              memory: 32Mi
+            requests:
+              cpu: 10m
+              memory: 16Mi
+{{- end }}

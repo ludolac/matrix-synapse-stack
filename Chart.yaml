@@ -2,7 +2,7 @@ apiVersion: v2
 name: matrix-synapse
 description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element Call, Coturn, CloudNativePG) on Kubernetes
 type: application
-version: 2.0.30
+version: 2.0.31
 appVersion: "1.151.0"
 keywords:
   - matrix
@@ -52,12 +52,14 @@ annotations:
   #   mas-cli. No in-place migration is provided — wipe + redeploy is expected.
   artifacthub.io/changes: |
     - kind: added
-      description: "Matrix Authentication Service (MAS) integration via mas.enabled (MSC3861, QR login, ElementX compatible)"
+      description: "rtc.livekit.room.enabledCodecs (default H.264 first → iOS hardware accel + VP8 fallback for browsers)"
     - kind: added
-      description: "CNPG Database CRD to provision mas_prod in the existing Synapse cluster"
+      description: "rtc.livekit.congestionControl.allowPause (dynacast pauses unsubscribed simulcast layers, saves CPU on iOS publishers)"
     - kind: added
-      description: "scripts/generate-mas-secrets.sh to bootstrap MAS cryptographic material"
+      description: "rtc.livekit.packetBufferSize{Video,Audio} application-level RTP buffers (compensate kernel rmem cap on managed K8s)"
+    - kind: added
+      description: "rtc.livekit.sysctlTuner DaemonSet (workaround net.core.rmem_max on OVH MKS / GKE / EKS, opt-in)"
+    - kind: added
+      description: "coturn.service.exposeTurnsHttps to expose TURNS on port 443/TCP for clients behind HTTPS-only firewalls"
     - kind: changed
-      description: "When mas.enabled=true, Synapse's legacy oidc_providers/password_config/registration_shared_secret are omitted"
-    - kind: changed
-      description: "Chart bumped to 2.0.0 (breaking) due to the auth model change"
+      description: "LiveKit defaults tuned for Element Call quality with iOS clients (Element X)"

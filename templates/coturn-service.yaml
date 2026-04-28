@@ -64,6 +64,17 @@ spec:
       {{- if and (eq .Values.coturn.service.type "NodePort") .Values.coturn.service.nodePorts.turnsTcp }}
       nodePort: {{ .Values.coturn.service.nodePorts.turnsTcp }}
       {{- end }}
+    {{- if .Values.coturn.service.exposeTurnsHttps }}
+    # TURNS over TCP/443 — traverses HTTPS-only firewalls (corporate, hotels,
+    # restrictive mobile carriers). Same backend as turns-tcp, exposed on 443.
+    - name: turns-https
+      port: 443
+      targetPort: turns-tcp
+      protocol: TCP
+      {{- if and (eq .Values.coturn.service.type "NodePort") .Values.coturn.service.nodePorts.turnsHttps }}
+      nodePort: {{ .Values.coturn.service.nodePorts.turnsHttps }}
+      {{- end }}
+    {{- end }}
     {{- if .Values.coturn.service.publishRelayPorts }}
     # Relay ports (coturn binds media traffic to UDP ports in relayPortRange).
     # Without this, only signaling (3478/5349) reaches the pod and media

@@ -815,22 +815,30 @@ coturn:
     # hostNetwork on the pod if you need a larger range.
     publishRelayPorts: false
 
+    # Expose TURNS (TLS) on port 443/TCP in addition to 5349. Helps clients
+    # behind HTTPS-only firewalls (some mobile carriers, corporate proxies,
+    # hotel WiFi). Backed by the same turns-tcp pod port as 5349 — coturn
+    # already listens; only the Service port mapping is added. Costs 1 extra
+    # LB port (= 1 OVH pool quota slot).
+    exposeTurnsHttps: false
+
     # Load balancer IP (optional)
     loadBalancerIP: ""
-    
+
     # External traffic policy (Local or Cluster)
     # Local preserves source IP but requires externalTrafficPolicy support
     externalTrafficPolicy: "Cluster"
-    
+
     # External IPs for the service (optional)
     externalIPs: []
-    
+
     # NodePort configuration (when type=NodePort)
     nodePorts:
-      turnUdp: null   # e.g., 30478
+      turnUdp: null    # e.g., 30478
       turnTcp: null
-      turnsUdp: null  # e.g., 30349
+      turnsUdp: null   # e.g., 30349
       turnsTcp: null
+      turnsHttps: null # e.g., 30443 (only used when exposeTurnsHttps=true)
     
     # Service annotations
     annotations: {}
@@ -1253,6 +1261,34 @@ rtc:
     apiSecret: ""
     existingSecret: ""  # Optional: name of pre-existing secret
 
+    # Application-level RTP packet buffer (compensates kernel rmem_max
+    # constraint on managed Kubernetes like OVH MKS). Defaults bumped from
+    # LiveKit's stock 500/200 to 1000/400.
+    packetBufferSizeVideo: 1000
+    packetBufferSizeAudio: 400
+
+    # Bandwidth estimation + dynacast.
+    congestionControl:
+      enabled: true
+      # Pause simulcast layers nobody subscribes to (saves CPU on publishers,
+      # critical for iOS Element X with E2EE).
+      allowPause: true
+      useSendSideBwe: true
+      # padding = pad with RTP padding packets for BWE probing.
+      probeMode: padding
+
+    # Optional DaemonSet that bumps net.core.rmem_max on every node, to work
+    # around managed-Kubernetes restrictions on unsafe sysctls. Required for
+    # production-grade Element Call deployments on OVH MKS / GKE / EKS where
+    # the default 425KB UDP rmem causes packet drops under burst.
+    # IMPORTANT: needs a permissive PodSecurity Standard (privileged allowed).
+    # On strict clusters, file a support ticket to bump sysctls instead.
+    sysctlTuner:
+      enabled: false
+      image: busybox:1.37
+      rmemMax: 7500000
+      wmemMax: 7500000
+
     # LiveKit room-level defaults (rendered under `room:` in config.yaml).
     # All fields optional — the template applies LiveKit's own defaults when
     # a field is unset.
@@ -1268,6 +1304,12 @@ rtc:
       emptyTimeout: 300
       # Allow SFU to unmute other participants remotely (moderator actions).
       enableRemoteUnmute: true
+      # SDP codec preference order. H.264 first → iOS hardware accel for
+      # Element X mobile (saves CPU with E2EE Insertable Streams overhead).
+      # Empty list = use chart defaults (h264, vp8, opus, red).
+      # Override to force a specific codec only (e.g. all-VP9 for E2EE
+      # without server-side restrictions, but breaks iOS perf).
+      enabledCodecs: []
 
     # UDP LoadBalancer for WebRTC media (muxed mode = single UDP port for
     # all sessions via SCTP/DTLS). Much cheaper than a port range.
