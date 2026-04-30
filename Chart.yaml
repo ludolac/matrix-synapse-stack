@@ -2,7 +2,7 @@ apiVersion: v2
 name: matrix-synapse
 description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element Call, Coturn, CloudNativePG) on Kubernetes
 type: application
-version: 2.0.34
+version: 2.0.35
 appVersion: "1.151.0"
 keywords:
   - matrix
@@ -51,6 +51,8 @@ annotations:
   #   blocks are removed (they conflict with MSC3861). Admin creation moves to
   #   mas-cli. No in-place migration is provided — wipe + redeploy is expected.
   artifacthub.io/changes: |
+    - kind: security
+      description: "sysctlTuner DaemonSet hardened: removed privileged: true and hostPID, replaced with CAP_NET_ADMIN only + readOnlyRootFilesystem + seccomp RuntimeDefault. Reduces blast radius if container is compromised. New values: rtc.livekit.sysctlTuner.nodeSelector and tolerations (default empty — no taint tolerated)."
     - kind: fixed
       description: "sysctlTuner DaemonSet: force decimal int rendering of rmemMax/wmemMax (Helm was emitting 7.5e+06 scientific notation, rejected by sysctl -w)"
     - kind: fixed

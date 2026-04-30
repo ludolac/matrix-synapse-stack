@@ -1286,13 +1286,28 @@ rtc:
     # around managed-Kubernetes restrictions on unsafe sysctls. Required for
     # production-grade Element Call deployments on OVH MKS / GKE / EKS where
     # the default 425KB UDP rmem causes packet drops under burst.
-    # IMPORTANT: needs a permissive PodSecurity Standard (privileged allowed).
-    # On strict clusters, file a support ticket to bump sysctls instead.
+    # SECURITY: tourne en hostNetwork avec CAP_NET_ADMIN (plus de privileged).
+    # Le namespace doit autoriser PodSecurity "baseline" minimum (pas restricted).
+    # Sur clusters strict, ouvrir un ticket pour bump sysctls côté kubelet.
     sysctlTuner:
       enabled: false
+      # Pin par digest recommandé en prod pour intégrité supply chain.
+      # docker buildx imagetools inspect busybox:1.37
       image: busybox:1.37
       rmemMax: 7500000
       wmemMax: 7500000
+      # Restreindre le DaemonSet aux nœuds hébergeant réellement LiveKit
+      # (réduit la surface d'attaque). Vide = tous les nœuds workers.
+      nodeSelector: {}
+      # Par défaut aucun taint toléré. Surcharger si LiveKit tourne sur
+      # des nœuds taintés (GPU, dedicated, etc.).
+      # Exemple :
+      #   tolerations:
+      #     - key: dedicated
+      #       operator: Equal
+      #       value: rtc
+      #       effect: NoSchedule
+      tolerations: []
 
     # LiveKit room-level defaults (rendered under `room:` in config.yaml).
     # All fields optional — the template applies LiveKit's own defaults when
