@@ -2,7 +2,7 @@ apiVersion: v2
 name: matrix-synapse
 description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element Call, Coturn, CloudNativePG) on Kubernetes
 type: application
-version: 2.0.38
+version: 2.0.39
 appVersion: "1.151.0"
 keywords:
   - matrix
@@ -51,6 +51,8 @@ annotations:
   #   blocks are removed (they conflict with MSC3861). Admin creation moves to
   #   mas-cli. No in-place migration is provided — wipe + redeploy is expected.
   artifacthub.io/changes: |
+    - kind: fixed
+      description: "sysctlTuner DaemonSet: bind-mount /proc/sys/net to /host-net (outside /proc) to bypass runc proc-safety check (CVE-2024-21626 mitigation rejected mounts from /proc to /proc). 2.0.37 crashed at container creation."
     - kind: fixed
       description: "sysctlTuner DaemonSet: write directly to bind-mounted /proc/sys/net (host hostPath) instead of `sysctl -w`. runc mounts /proc/sys read-only for non-privileged containers, breaking 2.0.35 hardening."
     - kind: security
