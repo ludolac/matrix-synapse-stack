@@ -1,0 +1,76 @@
+{{- if .Values.sydent.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-sydent-config
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sydent
+data:
+  sydent.conf: |
+    [general]
+    server.name = {{ .Values.sydent.serverName | required ".Values.sydent.serverName is required (= identity hostname)" }}
+    log.path =
+    log.level = {{ .Values.sydent.logLevel | default "INFO" }}
+    pidfile.path = /data/sydent.pid
+    terms.path =
+    address_lookup_limit = 10000
+    templates.path = /templates
+    brand.default = {{ .Values.sydent.brand | default "waadoo" }}
+    # Allow private IPs (Sydent has to call Synapse internal svc 10.x.x.x).
+    # Default blacklist would prevent /store-invite -> Synapse callback.
+    ip.blacklist =
+    ip.whitelist =
+    enable_v1_associations = true
+    delete_tokens_on_bind = true
+    enable_v1_access = true
+    {{- with .Values.sydent.homeserverAllowList }}
+    homeserver_allow_list = {{ . | join "," }}
+    {{- end }}
+
+    [db]
+    db.file = /data/sydent.db
+
+    [http]
+    clientapi.http.bind_address = ::
+    clientapi.http.port = 8090
+    # Internal API : used by sydent-bind (CronJob LDAP sync). Bind to all
+    # addresses ; restrict access via NetworkPolicy.
+    internalapi.http.bind_address = ::
+    internalapi.http.port = 8091
+    # Replication HTTPS (peer mesh). Disabled by default — single-replica only.
+    replication.https.bind_address = ::
+    replication.https.port = 4434
+    replication.https.certfile =
+    replication.https.cacert =
+    obey_x_forwarded_for = True
+    federation.verifycerts = True
+    client_http_base = {{ .Values.sydent.publicUrl | required ".Values.sydent.publicUrl is required" | trimSuffix "/" }}
+
+    [email]
+    email.from = {{ .Values.sydent.email.from | default "Sydent Validation <noreply@waadoo.cloud>" | quote }}
+    email.subject = {{ .Values.sydent.email.verifySubject | default "Your Waadoo Matrix validation token" | quote }}
+    email.invite.subject = {{ .Values.sydent.email.inviteSubject | default "%(sender_display_name)s has invited you to chat on Waadoo Matrix" | quote }}
+    email.invite.subject_space = {{ .Values.sydent.email.inviteSubjectSpace | default "%(sender_display_name)s has invited you to a space on Waadoo Matrix" | quote }}
+    email.smtphost = {{ .Values.sydent.email.smtp.host | required ".Values.sydent.email.smtp.host is required" }}
+    email.smtpport = {{ .Values.sydent.email.smtp.port | default 25 | quote }}
+    email.smtpusername = {{ .Values.sydent.email.smtp.username | default "" }}
+    email.smtppassword = {{ .Values.sydent.email.smtp.password | default "" }}
+    email.hostname =
+    email.tlsmode = {{ .Values.sydent.email.smtp.tlsmode | default "0" | quote }}
+    # IMPORTANT : fallback URL when Synapse does not pass web_client_location.
+    # Pointed at our Element so the invite link in emails opens our hosted UI
+    # instead of app.element.io. Override per env in umbrella chart.
+    email.default_web_client_location = {{ .Values.sydent.email.defaultWebClientLocation | required ".Values.sydent.email.defaultWebClientLocation is required" | quote }}
+    email.third_party_invite_username_obfuscate_characters = 3
+    email.third_party_invite_domain_obfuscate_characters = 3
+
+    [sms]
+    bodyTemplate =
+
+    [crypto]
+    # Empty on first boot : Sydent auto-generates the ed25519 signing key and
+    # persists it back to /data/sydent.conf. PVC must survive across pod
+    # restarts ; key rotation = delete /data/sydent.conf and restart pod.
+    ed25519.signingkey =
+{{- end }}

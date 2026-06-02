@@ -555,6 +555,96 @@ wellknown:
     enabled: false
     minAvailable: 1
 
+# ============================================================================
+# Sydent — self-hosted Matrix Identity Server (replaces vector.im)
+# ============================================================================
+# Use case : control the invite email template + sender domain. By default
+# Element clients delegate 3pid invites (invite-by-email) to vector.im, which
+# emails the invitee with a matrix.to link branded "app.element.io". Hosting
+# Sydent locally lets us send the email ourselves from no_reply@waadoo.cloud
+# (or similar) with a link pointing at our own Element instance.
+#
+# Limitations to know before enabling :
+# - Sydent only supports SQLite (no Postgres). Single replica + PVC.
+# - Sydent is in "maintenance-only" mode at element-hq/sydent (no new features,
+#   security patches only). Plan a migration if it goes fully unmaintained.
+# - Element X mobile clients do not implement the 3pid invite UI yet, so the
+#   "invite by email" workflow stays Web-only.
+# - Element delegates 3pid invites to the identity server advertised in the
+#   homeserver's .well-known/matrix/client AND in Element's config.json
+#   default_server_config.m.identity_server.
+#   When sydent.enabled: true, set both to https://<sydent.ingress.host> in
+#   your env overrides.
+sydent:
+  enabled: false                       # opt-in
+
+  image:
+    repository: ghcr.io/element-hq/sydent
+    tag: "v2.7.0"
+    pullPolicy: IfNotPresent
+
+  # Hostname Sydent advertises in signed payloads. MUST match the public
+  # ingress host (= what clients reach via TLS). Also used in default email
+  # templates as the signurl origin.
+  serverName: ""                       # ex: identity.dev.waadoo.ovh
+  # Public URL clients hit. Trailing slash optional.
+  publicUrl: ""                        # ex: https://identity.dev.waadoo.ovh
+  # Brand subdirectory under /templates/<brand>/ Sydent loads.
+  brand: "waadoo"
+  logLevel: "INFO"
+
+  # Restrict which homeservers may authenticate against this IS (signed by
+  # their server_signing_key). Empty = allow all.
+  homeserverAllowList: []
+  # ex: ["matrix.dev.waadoo.ovh"]
+
+  storage:
+    # ReadWriteOnce only (SQLite). Sized for tens of thousands of bindings.
+    size: 5Gi
+    storageClassName: ""
+
+  email:
+    from: ""                           # ex: 'Waadoo Matrix <no_reply@waadoo.cloud>'
+    verifySubject: "Your Waadoo Matrix validation token"
+    inviteSubject: "%(sender_display_name)s has invited you to chat on Waadoo Matrix"
+    inviteSubjectSpace: "%(sender_display_name)s has invited you to a space on Waadoo Matrix"
+    # Fallback web_client_location when Synapse doesn't pass one in
+    # store-invite. Pointed at our Element so the join link in emails opens
+    # our hosted UI (NOT app.element.io).
+    defaultWebClientLocation: ""       # ex: https://element.dev.waadoo.ovh
+    smtp:
+      host: ""                         # ex: smtp-relay.smtp-relay.svc.cluster.local
+      port: 25
+      username: ""
+      password: ""
+      # 0 = no TLS, 1 = STARTTLS, 2 = TLS (legacy SMTPS)
+      tlsmode: "0"
+
+  # Overridable Jinja2 + HTML templates. Defaults shipped in chart's helpers
+  # template ship Waadoo-branded versions where signurl points at serverName
+  # (NOT matrix.org / vector.im like the original res/ files).
+  templates:
+    invite: ""
+    verification: ""
+    verifyResponse: ""
+
+  ingress:
+    className: "traefik"
+    host: ""                           # ex: identity.dev.waadoo.ovh
+    annotations: {}
+    tls:
+      secretName: ""                   # ex: matrix-sydent-tls
+
+  podLabels: {}
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
 # Network policy
 # Creates separate NetworkPolicies for each component (Synapse, Element, PostgreSQL, Well-known)
 # with fine-grained ingress and egress rules

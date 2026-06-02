@@ -1,0 +1,130 @@
+{{- if .Values.sydent.enabled }}
+{{- /*
+Sydent uses SQLite — no horizontal scaling possible without the (legacy and
+fragile) replication mesh. StatefulSet with a single replica + PVC for the DB
+and the runtime config (Sydent rewrites sydent.conf on first boot to inject
+the ed25519 signing key).
+
+Init-container seeds /data/sydent.conf from the ConfigMap-mounted template
+on first boot only. Subsequent restarts preserve Sydent's auto-inserted key.
+*/}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-sydent
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sydent
+spec:
+  serviceName: {{ include "matrix-synapse.fullname" . }}-sydent-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "matrix-synapse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: sydent
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/sydent-configmap.yaml") . | sha256sum }}
+        checksum/templates: {{ include (print $.Template.BasePath "/sydent-templates-configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "matrix-synapse.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: sydent
+        {{- with .Values.sydent.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 993
+        runAsGroup: 993
+        fsGroup: 993
+      initContainers:
+        - name: config-init
+          image: busybox:1.37
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -eu
+              if [ ! -f /data/sydent.conf ]; then
+                cp /config-template/sydent.conf /data/sydent.conf
+                echo "Seeded /data/sydent.conf from ConfigMap"
+              else
+                echo "/data/sydent.conf already exists, leaving Sydent-managed config (signing key persisted)"
+              fi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: config-template
+              mountPath: /config-template
+            - name: data
+              mountPath: /data
+      containers:
+        - name: sydent
+          image: "{{ .Values.sydent.image.repository }}:{{ .Values.sydent.image.tag }}"
+          imagePullPolicy: {{ .Values.sydent.image.pullPolicy | default "IfNotPresent" }}
+          env:
+            - name: SYDENT_CONF
+              value: /data/sydent.conf
+            - name: SYDENT_PID_FILE
+              value: /data/sydent.pid
+            - name: SYDENT_DB_PATH
+              value: /data/sydent.db
+            - name: SYDENT_SERVER_NAME
+              value: {{ .Values.sydent.serverName | quote }}
+          ports:
+            - name: clientapi
+              containerPort: 8090
+              protocol: TCP
+            - name: internalapi
+              containerPort: 8091
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /_matrix/identity/v2
+              port: clientapi
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /_matrix/identity/v2
+              port: clientapi
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: templates
+              mountPath: /templates/{{ .Values.sydent.brand | default "waadoo" }}
+          resources:
+            {{- toYaml .Values.sydent.resources | nindent 12 }}
+      volumes:
+        - name: config-template
+          configMap:
+            name: {{ include "matrix-synapse.fullname" . }}-sydent-config
+        - name: templates
+          configMap:
+            name: {{ include "matrix-synapse.fullname" . }}-sydent-templates
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.sydent.storage.storageClassName }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.sydent.storage.size | default "5Gi" }}
+{{- end }}

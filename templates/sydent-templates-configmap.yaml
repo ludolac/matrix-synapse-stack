@@ -1,0 +1,31 @@
+{{- /*
+Sydent loads its email + verify response templates from a directory layout:
+  /templates/<brand>/invite_template.eml.j2
+  /templates/<brand>/verification_template.eml.j2
+  /templates/<brand>/verify_response_template.html
+
+The brand is selected per-request (via 'brand' query param) and falls back to
+general.brand.default (= sydent.brand). Each template can be overridden via
+.Values.sydent.templates.<key> ; defaults below ship Waadoo-branded versions
+where the signurl points at the local IS instead of matrix.org / vector.im.
+
+CRITICAL : the signurl in the join link must match the IS that issued the
+invite (this server). Hardcoding matrix.org would break the join flow on
+3pid claim — Sydent rejects sign-ed25519 calls from foreign servers.
+*/}}
+{{- if .Values.sydent.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-sydent-templates
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sydent
+data:
+  invite_template.eml.j2: |
+{{ .Values.sydent.templates.invite | default (include "matrix-synapse.sydent.defaultInviteTemplate" .) | indent 4 }}
+  verification_template.eml.j2: |
+{{ .Values.sydent.templates.verification | default (include "matrix-synapse.sydent.defaultVerificationTemplate" .) | indent 4 }}
+  verify_response_template.html: |
+{{ .Values.sydent.templates.verifyResponse | default (include "matrix-synapse.sydent.defaultVerifyResponseTemplate" .) | indent 4 }}
+{{- end }}

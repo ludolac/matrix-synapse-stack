@@ -1,0 +1,43 @@
+{{- if .Values.sydent.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-sydent
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sydent
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "matrix-synapse.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: sydent
+  ports:
+    - name: clientapi
+      port: 8090
+      targetPort: clientapi
+      protocol: TCP
+    - name: internalapi
+      port: 8091
+      targetPort: internalapi
+      protocol: TCP
+---
+# Headless service required by StatefulSet for stable network identity.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-sydent-headless
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sydent
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    {{- include "matrix-synapse.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: sydent
+  ports:
+    - name: clientapi
+      port: 8090
+      targetPort: clientapi
+      protocol: TCP
+{{- end }}

@@ -1,0 +1,84 @@
+{{- if and .Values.sydent.enabled .Values.networkPolicy.enabled }}
+{{- /*
+Sydent NetworkPolicy. Two ports involved :
+ - 8090 clientapi : public via Traefik, AND Synapse (for store-invite callbacks).
+ - 8091 internalapi : cluster-private, used by the LLDAP sync CronJob (uses
+   POST /_matrix/identity/internal/bind to upsert email->mxid bindings
+   without going through email verification).
+
+8091 must NOT be reachable from random pods. We allow ingress only from pods
+matching the LLDAP-sync component label.
+*/}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-sydent
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sydent
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "matrix-synapse.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: sydent
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Public client API : Traefik + Synapse pod (3pid invite store-invite callback)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: synapse
+              app.kubernetes.io/instance: {{ .Release.Name }}
+      ports:
+        - port: 8090
+          protocol: TCP
+    # Internal API : only the LLDAP sync CronJob (umbrella adds this pod with the
+    # well-known label below).
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: sydent-lldap-sync
+              app.kubernetes.io/instance: {{ .Release.Name }}
+      ports:
+        - port: 8091
+          protocol: TCP
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # SMTP relay (sends invite + verification emails)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 25
+          protocol: TCP
+        - port: 2525
+          protocol: TCP
+    # Synapse (callback for sign-ed25519 + store-invite)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: synapse
+              app.kubernetes.io/instance: {{ .Release.Name }}
+      ports:
+        - port: 8008
+          protocol: TCP
+    # Outbound HTTPS (federation lookups vs other IS / homeservers)
+    - ports:
+        - port: 443
+          protocol: TCP
+        - port: 8448
+          protocol: TCP
+{{- end }}

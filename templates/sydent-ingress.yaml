@@ -1,0 +1,32 @@
+{{- if and .Values.sydent.enabled .Values.sydent.ingress.host }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "matrix-synapse.fullname" . }}-sydent
+  labels:
+    {{- include "matrix-synapse.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sydent
+  {{- with .Values.sydent.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.sydent.ingress.className | default "traefik" }}
+  rules:
+    - host: {{ .Values.sydent.ingress.host | quote }}
+      http:
+        paths:
+          - path: /_matrix/identity
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "matrix-synapse.fullname" . }}-sydent
+                port:
+                  number: 8090
+  {{- with .Values.sydent.ingress.tls }}
+  tls:
+    - hosts:
+        - {{ $.Values.sydent.ingress.host | quote }}
+      secretName: {{ .secretName | required "sydent.ingress.tls.secretName required when ingress.host set" | quote }}
+  {{- end }}
+{{- end }}
