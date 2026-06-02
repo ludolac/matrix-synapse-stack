@@ -9,6 +9,7 @@ this server (Sydent rejects sign-ed25519 from foreign issuers).
 
 {{- define "matrix-synapse.sydent.defaultInviteTemplate" -}}
 {{- $sn := .Values.sydent.serverName -}}
+{{- $joinUrl := printf "{{ web_client_location }}/#/room/{{ room_id|urlencode }}?email={{ to|urlencode }}&signurl=https%%3A%%2F%%2F%s%%2F_matrix%%2Fidentity%%2Fapi%%2Fv1%%2Fsign-ed25519%%3Ftoken%%3D{{ token|urlencode }}%%26private_key%%3D{{ ephemeral_private_key|urlencode }}&room_name={{ room_name|urlencode }}&room_avatar_url={{ room_avatar_url|urlencode }}&inviter_name={{ sender_display_name|urlencode }}&guest_access_token={{ guest_access_token|urlencode }}&guest_user_id={{ guest_user_id|urlencode }}&room_type={{ room_type|urlencode }}" $sn -}}
 Date: {{`{{ date|safe }}`}}
 From: {{`{{ from|safe }}`}}
 To: {{`{{ to|safe }}`}}
@@ -24,17 +25,19 @@ Content-Disposition: inline
 
 Bonjour,
 
-{{`{{ sender_display_name|safe }}`}} {{`{{ bracketed_verified_sender|safe }}`}}vous a invite a rejoindre {{`{% if room_type == "m.space" %}`}}l'espace{{`{% else %}`}}le salon{{`{% endif %}`}}
-{{`{{ bracketed_room_name|safe }}`}}sur Waadoo Matrix.
+{{`{{ sender_display_name|safe }}`}} {{`{{ bracketed_verified_sender|safe }}`}}vous invite a rejoindre {{`{% if room_type == "m.space" %}`}}l'espace{{`{% else %}`}}le salon{{`{% endif %}`}} {{`{{ bracketed_room_name|safe }}`}}sur Waadoo Matrix.
 
-Cliquez sur le lien ci-dessous pour rejoindre la conversation :
+Pour rejoindre la conversation, cliquez sur le lien ci-dessous :
 
-{{`{{ web_client_location }}`}}/#/room/{{`{{ room_id|urlencode }}`}}?email={{`{{ to|urlencode }}`}}&signurl=https%3A%2F%2F{{ $sn }}%2F_matrix%2Fidentity%2Fapi%2Fv1%2Fsign-ed25519%3Ftoken%3D{{`{{ token|urlencode }}`}}%26private_key%3D{{`{{ ephemeral_private_key|urlencode }}`}}&room_name={{`{{ room_name|urlencode }}`}}&room_avatar_url={{`{{ room_avatar_url|urlencode }}`}}&inviter_name={{`{{ sender_display_name|urlencode }}`}}&guest_access_token={{`{{ guest_access_token|urlencode }}`}}&guest_user_id={{`{{ guest_user_id|urlencode }}`}}&room_type={{`{{ room_type|urlencode }}`}}
+{{ $joinUrl }}
 
-Si vous n'avez pas encore de compte, le lien vous proposera d'en creer un.
+Vous n'avez pas encore de compte ? Pas de probleme : le lien vous proposera d'en creer un automatiquement.
 
-A bientot,
-Waadoo
+---
+Waadoo Matrix
+Cet email vous est envoye a la demande de {{`{{ sender_display_name|safe }}`}}.
+Conditions d'utilisation : https://waadoo.ovh/terms
+Politique de confidentialite : https://waadoo.ovh/privacy
 
 --{{`{{ multipart_boundary|safe }}`}}
 Content-Type: text/html; charset=UTF-8
@@ -44,31 +47,97 @@ Content-Disposition: inline
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
-    <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; color: #333; line-height: 1.5; }
-      .container { max-width: 560px; margin: 24px auto; padding: 24px; }
-      h1 { color: #0dbd8b; font-size: 22px; }
-      .button { display: inline-block; background: #0dbd8b; color: #fff !important; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; }
-      .footer { margin-top: 24px; color: #888; font-size: 12px; }
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="x-apple-disable-message-reformatting" />
+    <title>Invitation Waadoo Matrix</title>
+    <style type="text/css">
+      body, html { margin: 0; padding: 0; }
+      table { border-collapse: collapse; }
+      img { display: block; border: 0; outline: none; text-decoration: none; }
+      a { color: #0dbd8b; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        color: #1a1d23;
+        background-color: #f5f6f7;
+        -webkit-font-smoothing: antialiased;
+        line-height: 1.5;
+      }
+      .container { max-width: 600px; margin: 24px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+      .header { background: linear-gradient(135deg, #0dbd8b 0%, #0a9d75 100%); padding: 36px 24px; text-align: center; color: #ffffff; }
+      .header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+      .header .badge { display: inline-block; background-color: rgba(255,255,255,0.18); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-bottom: 12px; letter-spacing: 0.05em; text-transform: uppercase; }
+      .content { padding: 32px 28px; }
+      .room-card { background-color: #f5f6f7; border-left: 4px solid #0dbd8b; padding: 16px 20px; border-radius: 8px; margin: 24px 0; }
+      .room-card .label { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; font-weight: 600; }
+      .room-card .name { font-size: 18px; font-weight: 600; color: #1a1d23; word-break: break-word; }
+      .button-wrap { text-align: center; margin: 32px 0 20px; }
+      .button { display: inline-block; background-color: #0dbd8b; color: #ffffff !important; padding: 14px 36px; text-decoration: none; font-weight: 600; border-radius: 8px; font-size: 16px; box-shadow: 0 2px 4px rgba(13,189,139,0.25); }
+      .fallback-label { font-size: 13px; color: #6b7280; text-align: center; margin-bottom: 8px; }
+      .fallback { font-size: 12px; color: #4b5563; word-break: break-all; padding: 12px 14px; background-color: #f5f6f7; border-radius: 6px; font-family: ui-monospace, "SF Mono", monospace; }
+      .info { background-color: #eef9f5; border-radius: 8px; padding: 14px 16px; margin-top: 28px; font-size: 14px; color: #0a5d4a; }
+      .info b { color: #0dbd8b; }
+      .footer { padding: 20px 24px; text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; line-height: 1.6; }
+      .footer a { color: #6b7280; text-decoration: none; }
+      .footer .sep { color: #d1d5db; padding: 0 6px; }
+      @media only screen and (max-width: 600px) {
+        .container { margin: 0; border-radius: 0; }
+        .header { padding: 28px 16px; }
+        .content { padding: 24px 16px; }
+        .footer { padding: 20px 16px; }
+        .button { display: block !important; padding: 14px 16px; }
+      }
     </style>
   </head>
   <body>
-    <div class="container">
-      <h1>Invitation a rejoindre Waadoo Matrix</h1>
-      <p>
-        {{`{{ sender_display_name|safe }}`}} {{`{{ bracketed_verified_sender|safe }}`}}vous a invite a rejoindre
-        {{`{% if room_type == "m.space" %}`}}l'espace{{`{% else %}`}}le salon{{`{% endif %}`}}
-        <b>{{`{{ bracketed_room_name|safe }}`}}</b>.
-      </p>
-      <p>
-        <a class="button" href="{{`{{ web_client_location }}`}}/#/room/{{`{{ room_id|urlencode }}`}}?email={{`{{ to|urlencode }}`}}&signurl=https%3A%2F%2F{{ $sn }}%2F_matrix%2Fidentity%2Fapi%2Fv1%2Fsign-ed25519%3Ftoken%3D{{`{{ token|urlencode }}`}}%26private_key%3D{{`{{ ephemeral_private_key|urlencode }}`}}&room_name={{`{{ room_name|urlencode }}`}}&room_avatar_url={{`{{ room_avatar_url|urlencode }}`}}&inviter_name={{`{{ sender_display_name|urlencode }}`}}&guest_access_token={{`{{ guest_access_token|urlencode }}`}}&guest_user_id={{`{{ guest_user_id|urlencode }}`}}&room_type={{`{{ room_type|urlencode }}`}}">
-          Rejoindre la conversation
-        </a>
-      </p>
-      <p class="footer">
-        Si vous n'avez pas encore de compte Waadoo Matrix, le lien vous proposera d'en creer un.
-      </p>
-    </div>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f5f6f7;">
+      <tr>
+        <td align="center">
+          <div class="container">
+            <div class="header">
+              <div class="badge">{{`{% if room_type == "m.space" %}`}}Espace{{`{% else %}`}}Salon{{`{% endif %}`}}</div>
+              <h1>Vous etes invite sur Waadoo Matrix</h1>
+            </div>
+            <div class="content">
+              <p style="margin-top:0;">
+                <b>{{`{{ sender_display_name|safe }}`}}</b> {{`{{ bracketed_verified_sender|safe }}`}}
+                vous invite a rejoindre
+                {{`{% if room_type == "m.space" %}`}}l'espace{{`{% else %}`}}le salon{{`{% endif %}`}}
+                ci-dessous.
+              </p>
+
+              {{`{% if room_name %}`}}
+              <div class="room-card">
+                <div class="label">{{`{% if room_type == "m.space" %}`}}Espace{{`{% else %}`}}Salon{{`{% endif %}`}}</div>
+                <div class="name">{{`{{ room_name|safe }}`}}</div>
+              </div>
+              {{`{% endif %}`}}
+
+              <div class="button-wrap">
+                <a class="button" href="{{ $joinUrl }}">Rejoindre la conversation</a>
+              </div>
+
+              <p class="fallback-label">Le bouton ne fonctionne pas ? Copiez ce lien dans votre navigateur :</p>
+              <div class="fallback">{{ $joinUrl }}</div>
+
+              <div class="info">
+                <p style="margin:0;">
+                  <b>Pourquoi je recois cet email ?</b><br>
+                  Waadoo Matrix est notre messagerie d'equipe securisee.
+                  Si vous n'avez pas encore de compte, le lien ci-dessus vous proposera
+                  d'en creer un automatiquement (gratuit, quelques secondes).
+                </p>
+              </div>
+            </div>
+            <div class="footer">
+              Envoye a la demande de <b>{{`{{ sender_display_name|safe }}`}}</b>.<br>
+              <a href="https://waadoo.ovh/terms">Conditions d'utilisation</a>
+              <span class="sep">&middot;</span>
+              <a href="https://waadoo.ovh/privacy">Confidentialite</a>
+            </div>
+          </div>
+        </td>
+      </tr>
+    </table>
   </body>
 </html>
 
