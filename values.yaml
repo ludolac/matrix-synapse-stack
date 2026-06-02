@@ -633,10 +633,19 @@ sydent:
     storageClassName: ""
 
   email:
-    from: ""                           # ex: 'Waadoo Matrix <no_reply@waadoo.cloud>'
-    verifySubject: "Your Waadoo Matrix validation token"
-    inviteSubject: "%(sender_display_name)s has invited you to chat on Waadoo Matrix"
-    inviteSubjectSpace: "%(sender_display_name)s has invited you to a space on Waadoo Matrix"
+    from: ""                           # ex: 'no_reply@waadoo.cloud' (bare address ; relays like
+                                       # Infomaniak reject display-name envelopes as 'Sender mismatch')
+    # Subject lines passed through Python %()s formatting at send time ;
+    # available keys = the substitutions dict from store_invite_servlet
+    # (sender_display_name, room_name…). RFC2047-encoded for accents.
+    verifySubject: "Confirmation de votre adresse email - Waadoo Matrix"
+    inviteSubject: "Invitation à discuter avec %(sender_display_name)s sur Waadoo Matrix"
+    inviteSubjectSpace: "Invitation à rejoindre un espace partagé par %(sender_display_name)s sur Waadoo Matrix"
+    # Optional URL of a brand logo embedded at the top of the invite +
+    # verification HTML emails (PNG/SVG via HTTPS, recommended ~200x60 or
+    # square 64x64 for retina). Most mail clients block remote images by
+    # default ; the recipient has to click "Show images" to see it.
+    logoUrl: ""
     # Fallback web_client_location when Synapse doesn't pass one in
     # store-invite. Pointed at our Element so the join link in emails opens
     # our hosted UI (NOT app.element.io).

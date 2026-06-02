@@ -52,6 +52,10 @@ annotations:
   #   mas-cli. No in-place migration is provided — wipe + redeploy is expected.
   artifacthub.io/changes: |
     - kind: added
+      description: "sydent.email.logoUrl : optional brand logo URL embedded at the top of invite + verification HTML emails (PNG/SVG via HTTPS). Most clients block remote images by default — recipients have to click 'Show images' to see it. Default empty (logo block omitted)."
+    - kind: changed
+      description: "Default invite + verification email subjects + body switched to French (Waadoo-targeted). Override via .Values.sydent.email.{verifySubject,inviteSubject,inviteSubjectSpace} and .Values.sydent.templates.{invite,verification,verifyResponse} for other locales / branding."
+    - kind: added
       description: "sydent.terms.{enabled,masterVersion,termsOfService,privacyPolicy} : serve /_matrix/identity/v2/terms with custom T&Cs URLs. Required to suppress Element's 'identity server has no terms of service' prompt on every 3pid invite. ToS file rendered into the sydent-config ConfigMap and mounted read-only ; bumping version triggers an Element re-consent."
     - kind: added
       description: "sydent: opt-in self-hosted Matrix Identity Server (element-hq/sydent v2.7.0). Replaces vector.im for 3pid (invite-by-email) flows so the invite email sender + template + signurl all live under your domain. Includes Waadoo-branded HTML invite/verification templates (overridable via .Values.sydent.templates). Single-replica StatefulSet + PVC (SQLite). Pair with an external LLDAP→Sydent sync CronJob (umbrella chart) to pre-populate email→MXID bindings without per-user email verification."

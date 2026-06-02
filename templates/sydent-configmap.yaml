@@ -59,10 +59,10 @@ data:
     # the values get embedded literally into the rendered email + SMTP
     # envelope. With quotes, both check_valid_email_address and the upstream
     # SMTP relay reject the message ("Sender mismatch").
-    email.from = {{ .Values.sydent.email.from | default "Sydent Validation <noreply@waadoo.cloud>" }}
-    email.subject = {{ .Values.sydent.email.verifySubject | default "Your Waadoo Matrix validation token" }}
-    email.invite.subject = {{ .Values.sydent.email.inviteSubject | default "%(sender_display_name)s has invited you to chat on Waadoo Matrix" }}
-    email.invite.subject_space = {{ .Values.sydent.email.inviteSubjectSpace | default "%(sender_display_name)s has invited you to a space on Waadoo Matrix" }}
+    email.from = {{ .Values.sydent.email.from | default "noreply@waadoo.cloud" }}
+    email.subject = {{ .Values.sydent.email.verifySubject | default "Confirmation de votre adresse email - Waadoo Matrix" }}
+    email.invite.subject = {{ .Values.sydent.email.inviteSubject | default "Invitation à discuter avec %(sender_display_name)s sur Waadoo Matrix" }}
+    email.invite.subject_space = {{ .Values.sydent.email.inviteSubjectSpace | default "Invitation à rejoindre un espace partagé par %(sender_display_name)s sur Waadoo Matrix" }}
     email.smtphost = {{ .Values.sydent.email.smtp.host | required ".Values.sydent.email.smtp.host is required" }}
     email.smtpport = {{ .Values.sydent.email.smtp.port | default 25 }}
     email.smtpusername = {{ .Values.sydent.email.smtp.username | default "" }}

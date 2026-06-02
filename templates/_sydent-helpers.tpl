@@ -9,6 +9,7 @@ this server (Sydent rejects sign-ed25519 from foreign issuers).
 
 {{- define "matrix-synapse.sydent.defaultInviteTemplate" -}}
 {{- $sn := .Values.sydent.serverName -}}
+{{- $logoUrl := .Values.sydent.email.logoUrl | default "" -}}
 {{- $joinUrl := printf "{{ web_client_location }}/#/room/{{ room_id|urlencode }}?email={{ to|urlencode }}&signurl=https%%3A%%2F%%2F%s%%2F_matrix%%2Fidentity%%2Fapi%%2Fv1%%2Fsign-ed25519%%3Ftoken%%3D{{ token|urlencode }}%%26private_key%%3D{{ ephemeral_private_key|urlencode }}&room_name={{ room_name|urlencode }}&room_avatar_url={{ room_avatar_url|urlencode }}&inviter_name={{ sender_display_name|urlencode }}&guest_access_token={{ guest_access_token|urlencode }}&guest_user_id={{ guest_user_id|urlencode }}&room_type={{ room_type|urlencode }}" $sn -}}
 Date: {{`{{ date|safe }}`}}
 From: {{`{{ from|safe }}`}}
@@ -25,19 +26,19 @@ Content-Disposition: inline
 
 Bonjour,
 
-{{`{{ sender_display_name|safe }}`}} {{`{{ bracketed_verified_sender|safe }}`}}vous invite a rejoindre {{`{% if room_type == "m.space" %}`}}l'espace{{`{% else %}`}}le salon{{`{% endif %}`}} {{`{{ bracketed_room_name|safe }}`}}sur Waadoo Matrix.
+{{`{{ sender_display_name|safe }}`}} {{`{{ bracketed_verified_sender|safe }}`}}vous invite à rejoindre {{`{% if room_type == "m.space" %}`}}l'espace{{`{% else %}`}}le salon{{`{% endif %}`}} {{`{{ bracketed_room_name|safe }}`}}sur Waadoo Matrix.
 
 Pour rejoindre la conversation, cliquez sur le lien ci-dessous :
 
 {{ $joinUrl }}
 
-Vous n'avez pas encore de compte ? Pas de probleme : le lien vous proposera d'en creer un automatiquement.
+Vous n'avez pas encore de compte ? Pas de problème : le lien vous proposera d'en créer un automatiquement.
 
 ---
 Waadoo Matrix
-Cet email vous est envoye a la demande de {{`{{ sender_display_name|safe }}`}}.
+Cet email vous est envoyé à la demande de {{`{{ sender_display_name|safe }}`}}.
 Conditions d'utilisation : https://waadoo.ovh/terms
-Politique de confidentialite : https://waadoo.ovh/privacy
+Politique de confidentialité : https://waadoo.ovh/privacy
 
 --{{`{{ multipart_boundary|safe }}`}}
 Content-Type: text/html; charset=UTF-8
@@ -94,13 +95,16 @@ Content-Disposition: inline
         <td align="center">
           <div class="container">
             <div class="header">
+              {{- if $logoUrl }}
+              <img src="{{ $logoUrl }}" alt="Waadoo" height="48" style="display:inline-block;margin-bottom:16px;max-height:48px;height:48px;width:auto;border:0;" />
+              {{- end }}
               <div class="badge">{{`{% if room_type == "m.space" %}`}}Espace{{`{% else %}`}}Salon{{`{% endif %}`}}</div>
-              <h1>Vous etes invite sur Waadoo Matrix</h1>
+              <h1>Vous êtes invité sur Waadoo Matrix</h1>
             </div>
             <div class="content">
               <p style="margin-top:0;">
                 <b>{{`{{ sender_display_name|safe }}`}}</b> {{`{{ bracketed_verified_sender|safe }}`}}
-                vous invite a rejoindre
+                vous invite à rejoindre
                 {{`{% if room_type == "m.space" %}`}}l'espace{{`{% else %}`}}le salon{{`{% endif %}`}}
                 ci-dessous.
               </p>
@@ -121,15 +125,15 @@ Content-Disposition: inline
 
               <div class="info">
                 <p style="margin:0;">
-                  <b>Pourquoi je recois cet email ?</b><br>
-                  Waadoo Matrix est notre messagerie d'equipe securisee.
+                  <b>Pourquoi je reçois cet email ?</b><br>
+                  Waadoo Matrix est notre messagerie d'équipe sécurisée.
                   Si vous n'avez pas encore de compte, le lien ci-dessus vous proposera
-                  d'en creer un automatiquement (gratuit, quelques secondes).
+                  d'en créer un automatiquement (gratuit, quelques secondes).
                 </p>
               </div>
             </div>
             <div class="footer">
-              Envoye a la demande de <b>{{`{{ sender_display_name|safe }}`}}</b>.<br>
+              Envoyé à la demande de <b>{{`{{ sender_display_name|safe }}`}}</b>.<br>
               <a href="https://waadoo.ovh/terms">Conditions d'utilisation</a>
               <span class="sep">&middot;</span>
               <a href="https://waadoo.ovh/privacy">Confidentialite</a>
@@ -145,7 +149,7 @@ Content-Disposition: inline
 {{- end }}
 
 {{- define "matrix-synapse.sydent.defaultVerificationTemplate" -}}
-{{- $sn := .Values.sydent.serverName -}}
+{{- $logoUrl := .Values.sydent.email.logoUrl | default "" -}}
 Date: {{`{{ date|safe }}`}}
 From: {{`{{ from|safe }}`}}
 To: {{`{{ to|safe }}`}}
@@ -165,9 +169,9 @@ Pour confirmer cette adresse email sur Waadoo Matrix, cliquez sur le lien ci-des
 
 {{`{{ link|safe }}`}}
 
-Si vous n'avez pas demande cette validation, ignorez cet email.
+Si vous n'avez pas demandé cette validation, ignorez cet email.
 
-A bientot,
+À bientôt,
 Waadoo
 
 --{{`{{ multipart_boundary|safe }}`}}
@@ -176,20 +180,52 @@ Content-Disposition: inline
 
 <!doctype html>
 <html lang="fr">
-  <head><meta charset="utf-8" /></head>
-  <body style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#333;max-width:560px;margin:24px auto;padding:24px;">
-    <h1 style="color:#0dbd8b;font-size:22px;">Confirmer votre email</h1>
-    <p>
-      Pour confirmer cette adresse email sur Waadoo Matrix, cliquez sur le lien ci-dessous :
-    </p>
-    <p>
-      <a style="display:inline-block;background:#0dbd8b;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;" href="{{`{{ link|safe }}`}}">
-        Valider mon email
-      </a>
-    </p>
-    <p style="margin-top:24px;color:#888;font-size:12px;">
-      Si vous n'avez pas demande cette validation, ignorez cet email.
-    </p>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body style="margin:0;padding:0;background-color:#f5f6f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1d23;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f5f6f7;">
+      <tr>
+        <td align="center">
+          <div style="max-width:560px;margin:24px auto;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+            <div style="background:linear-gradient(135deg,#0dbd8b 0%,#0a9d75 100%);padding:32px 24px;text-align:center;color:#ffffff;">
+              {{- if $logoUrl }}
+              <img src="{{ $logoUrl }}" alt="Waadoo" height="48" style="display:inline-block;margin-bottom:16px;max-height:48px;height:48px;width:auto;border:0;" />
+              {{- end }}
+              <h1 style="margin:0;font-size:22px;font-weight:700;">Confirmer votre adresse email</h1>
+            </div>
+            <div style="padding:32px 28px;line-height:1.5;">
+              <p style="margin-top:0;">Bonjour,</p>
+              <p>
+                Pour finaliser la validation de cette adresse email sur Waadoo Matrix,
+                cliquez sur le bouton ci-dessous :
+              </p>
+              <div style="text-align:center;margin:32px 0;">
+                <a href="{{`{{ link|safe }}`}}" style="display:inline-block;background-color:#0dbd8b;color:#ffffff !important;padding:14px 36px;text-decoration:none;font-weight:600;border-radius:8px;font-size:16px;box-shadow:0 2px 4px rgba(13,189,139,0.25);">
+                  Valider mon email
+                </a>
+              </div>
+              <p style="font-size:13px;color:#6b7280;text-align:center;">
+                Le bouton ne fonctionne pas ? Copiez ce lien dans votre navigateur :
+              </p>
+              <div style="font-size:12px;color:#4b5563;word-break:break-all;padding:12px 14px;background-color:#f5f6f7;border-radius:6px;font-family:ui-monospace,'SF Mono',monospace;">
+                {{`{{ link|safe }}`}}
+              </div>
+              <p style="margin-top:28px;color:#6b7280;font-size:13px;">
+                Si vous n'êtes pas à l'origine de cette demande, ignorez ce message —
+                aucune adresse ne sera ajoutée à votre compte.
+              </p>
+            </div>
+            <div style="padding:20px 24px;text-align:center;font-size:12px;color:#9ca3af;border-top:1px solid #f3f4f6;">
+              <a href="https://waadoo.ovh/terms" style="color:#6b7280;text-decoration:none;">Conditions d'utilisation</a>
+              <span style="color:#d1d5db;padding:0 6px;">&middot;</span>
+              <a href="https://waadoo.ovh/privacy" style="color:#6b7280;text-decoration:none;">Confidentialité</a>
+            </div>
+          </div>
+        </td>
+      </tr>
+    </table>
   </body>
 </html>
 
