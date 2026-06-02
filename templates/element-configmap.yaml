@@ -12,10 +12,11 @@ data:
         "m.homeserver": {
           "base_url": "{{ .Values.element.config.defaultServerUrl }}",
           "server_name": "{{ .Values.element.config.defaultServerName }}"
-        },
+        }{{- if (.Values.element.config.identityServer).enabled | default false }},
         "m.identity_server": {
-          "base_url": "https://vector.im"
+          "base_url": {{ .Values.element.config.identityServer.baseUrl | default "https://vector.im" | quote }}
         }
+        {{- end }}
       },
       "brand": "Element",
       "integrations_ui_url": "{{ .Values.element.config.integrations.uiUrl }}",

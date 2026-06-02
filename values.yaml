@@ -408,6 +408,16 @@ element:
     features:
       showLabsSettings: false
       enableWidgets: true
+    # Identity server (3pid lookup + email/SMS invites). When enabled, Element
+    # advertises it in default_server_config.m.identity_server and uses it for
+    # email-based invite flows (the IS sends the invite email with a matrix.to
+    # link pointing back to its own UI — typically app.element.io).
+    # Disable to fall back to homeserver-issued 3pid invites: Synapse sends
+    # the invite email itself using email.clientBaseUrl as the link prefix,
+    # so links point to your own Element instance.
+    identityServer:
+      enabled: true
+      baseUrl: "https://vector.im"
     # Integration manager
     integrations:
       enabled: true
@@ -511,6 +521,15 @@ affinity: {}
 # depend on it). Section exists so operators can scale it without editing
 # the template.
 wellknown:
+  # Identity server advertised in /.well-known/matrix/client as
+  # m.identity_server. Clients use it for 3pid lookups (email->MXID) and
+  # email-based room invites. When disabled, the key is omitted and clients
+  # fall back to homeserver-issued 3pid invites (Synapse sends the invite
+  # email itself using email.clientBaseUrl).
+  identityServer:
+    enabled: true
+    baseUrl: "https://vector.im"
+
   # 2 replicas by default for HA across nodes. Bump higher for intense
   # federation traffic; drop to 1 for dev/homelab to save resources.
   replicaCount: 2

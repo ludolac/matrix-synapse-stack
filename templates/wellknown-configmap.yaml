@@ -15,9 +15,11 @@ data:
       "m.homeserver": {
         "base_url": "https://{{ .Values.synapse.server.name }}"
       },
+      {{- if (.Values.wellknown.identityServer).enabled | default false }}
       "m.identity_server": {
-        "base_url": "https://vector.im"
+        "base_url": {{ .Values.wellknown.identityServer.baseUrl | default "https://vector.im" | quote }}
       },
+      {{- end }}
       "org.matrix.msc3575.proxy": {
         "url": "https://{{ .Values.synapse.server.name }}"
       }{{- if .Values.mas.enabled }},
