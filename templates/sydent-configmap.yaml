@@ -55,10 +55,14 @@ data:
     client_http_base = {{ .Values.sydent.publicUrl | required ".Values.sydent.publicUrl is required" | trimSuffix "/" }}
 
     [email]
-    email.from = {{ .Values.sydent.email.from | default "Sydent Validation <noreply@waadoo.cloud>" | quote }}
-    email.subject = {{ .Values.sydent.email.verifySubject | default "Your Waadoo Matrix validation token" | quote }}
-    email.invite.subject = {{ .Values.sydent.email.inviteSubject | default "%(sender_display_name)s has invited you to chat on Waadoo Matrix" | quote }}
-    email.invite.subject_space = {{ .Values.sydent.email.inviteSubjectSpace | default "%(sender_display_name)s has invited you to a space on Waadoo Matrix" | quote }}
+    # No surrounding quotes : Sydent's ConfigParser does not strip them, and
+    # the values get embedded literally into the rendered email + SMTP
+    # envelope. With quotes, both check_valid_email_address and the upstream
+    # SMTP relay reject the message ("Sender mismatch").
+    email.from = {{ .Values.sydent.email.from | default "Sydent Validation <noreply@waadoo.cloud>" }}
+    email.subject = {{ .Values.sydent.email.verifySubject | default "Your Waadoo Matrix validation token" }}
+    email.invite.subject = {{ .Values.sydent.email.inviteSubject | default "%(sender_display_name)s has invited you to chat on Waadoo Matrix" }}
+    email.invite.subject_space = {{ .Values.sydent.email.inviteSubjectSpace | default "%(sender_display_name)s has invited you to a space on Waadoo Matrix" }}
     email.smtphost = {{ .Values.sydent.email.smtp.host | required ".Values.sydent.email.smtp.host is required" }}
     email.smtpport = {{ .Values.sydent.email.smtp.port | default 25 }}
     email.smtpusername = {{ .Values.sydent.email.smtp.username | default "" }}
@@ -68,7 +72,7 @@ data:
     # IMPORTANT : fallback URL when Synapse does not pass web_client_location.
     # Pointed at our Element so the invite link in emails opens our hosted UI
     # instead of app.element.io. Override per env in umbrella chart.
-    email.default_web_client_location = {{ .Values.sydent.email.defaultWebClientLocation | required ".Values.sydent.email.defaultWebClientLocation is required" | quote }}
+    email.default_web_client_location = {{ .Values.sydent.email.defaultWebClientLocation | required ".Values.sydent.email.defaultWebClientLocation is required" }}
     email.third_party_invite_username_obfuscate_characters = 3
     email.third_party_invite_domain_obfuscate_characters = 3
 
