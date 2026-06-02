@@ -76,6 +76,31 @@ data:
       - client_id: "0000000000000000000SYNAPSE"
         client_auth_method: client_secret_basic
         client_secret: "${SYNAPSE_CLIENT_SECRET}"
+      {{- /*
+      Extra OAuth2 clients for site-specific automations (admin API callers,
+      bots, etc). Each entry must declare client_id + client_auth_method +
+      client_secret. The secret is referenced as ${ENV_VAR} and resolved by
+      the render-config init container ; the env var name comes from
+      .secretEnvKey (default = upper-cased <id>_CLIENT_SECRET).
+
+      To grant a client admin scope on the MAS API, also add its id to
+      .Values.mas.policy.adminClients.
+      */ -}}
+      {{- range $i, $c := .Values.mas.extraClients | default list }}
+      - client_id: {{ $c.id | quote }}
+        client_auth_method: {{ $c.clientAuthMethod | default "client_secret_basic" | quote }}
+        {{- $envKey := $c.secretEnvKey | default (printf "%s_CLIENT_SECRET" (upper (replace "-" "_" $c.id))) }}
+        client_secret: "${{"{"}}{{ $envKey }}{{"}"}}"
+      {{- end }}
+
+    {{- with .Values.mas.policy.adminClients }}
+    policy:
+      data:
+        admin_clients:
+          {{- range . }}
+          - {{ . | quote }}
+          {{- end }}
+    {{- end }}
 
     upstream_oauth2:
       providers:

@@ -1205,6 +1205,36 @@ mas:
     external:
       existingSecret: ""
 
+  # Extra OAuth2 clients for site-specific automations (admin API callers,
+  # bots, etc). The Synapse client (0000000000000000000SYNAPSE) is always
+  # rendered ; entries here are appended.
+  #
+  # Each entry:
+  #   id              client_id (any string, but ULID recommended)
+  #   clientAuthMethod  client_secret_basic | client_secret_post | client_secret_jwt | none
+  #                   (default: client_secret_basic)
+  #   secretEnvKey    optional override for the env var name resolved by the
+  #                   render-config init container. Default:
+  #                     "{{ upper (replace '-' '_' id) }}_CLIENT_SECRET"
+  #                   The env var itself comes from mas.existingSecret.
+  #
+  # Example — LLDAP sync CronJob that needs admin API access (see also
+  # mas.policy.adminClients below) :
+  #   extraClients:
+  #     - id: "01ABCDEF..."
+  #       clientAuthMethod: client_secret_basic
+  #       secretEnvKey: LLDAP_SYNC_CLIENT_SECRET
+  extraClients: []
+
+  # MAS policy overrides — passed through to the policy module via
+  # `policy.data`. Currently used to grant admin scope to specific clients.
+  policy:
+    # client_ids that may request the `urn:mas:admin` scope. Required to call
+    # the MAS admin API (POST /api/admin/v1/users, etc) from a non-human
+    # automation.
+    adminClients: []
+    # ex: ["01ABCDEF..."]
+
   # Upstream OIDC provider(s) — MAS delegates authentication to these.
   # At least one provider is required. Leave the list empty to disable MAS.
   upstreamOauth2:
