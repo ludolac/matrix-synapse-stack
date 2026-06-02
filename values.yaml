@@ -598,6 +598,35 @@ sydent:
   homeserverAllowList: []
   # ex: ["matrix.dev.waadoo.ovh"]
 
+  # Terms of Service & Privacy Policy.
+  # Element clients prompt the user every time they attach to a new IS that
+  # has no T&Cs published ("Le serveur d'identite n'a pas de conditions de
+  # service"). Enabling this serves /_matrix/identity/v2/terms with the
+  # entries below ; users accept once and the prompt disappears.
+  # URLs can point anywhere (HTML, PDF, hosted somewhere reachable from a
+  # browser). Bump versions when content changes — clients re-prompt then.
+  terms:
+    enabled: false
+    masterVersion: "1.0"
+    termsOfService:
+      version: "1.0"
+      langs:
+        en:
+          name: "Terms of Service"
+          url: "https://example.org/terms.html"
+        fr:
+          name: "Conditions d'utilisation"
+          url: "https://example.org/terms.html"
+    privacyPolicy:
+      version: "1.0"
+      langs:
+        en:
+          name: "Privacy Policy"
+          url: "https://example.org/privacy.html"
+        fr:
+          name: "Politique de confidentialite"
+          url: "https://example.org/privacy.html"
+
   storage:
     # ReadWriteOnce only (SQLite). Sized for tens of thousands of bindings.
     size: 5Gi

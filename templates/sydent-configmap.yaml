@@ -13,7 +13,14 @@ data:
     log.path =
     log.level = {{ .Values.sydent.logLevel | default "INFO" }}
     pidfile.path = /data/sydent.pid
+    {{- if .Values.sydent.terms.enabled }}
+    # Terms file is shipped via the same ConfigMap as sydent.conf, mounted
+    # read-only at /config-template/ by the StatefulSet. Sydent re-reads it
+    # on each /v2/terms request.
+    terms.path = /config-template/terms.yaml
+    {{- else }}
     terms.path =
+    {{- end }}
     address_lookup_limit = 10000
     templates.path = /templates
     brand.default = {{ .Values.sydent.brand | default "waadoo" }}
@@ -73,4 +80,25 @@ data:
     # persists it back to /data/sydent.conf. PVC must survive across pod
     # restarts ; key rotation = delete /data/sydent.conf and restart pod.
     ed25519.signingkey =
+  {{- if .Values.sydent.terms.enabled }}
+  terms.yaml: |
+    master_version: {{ .Values.sydent.terms.masterVersion | default "1.0" | quote }}
+    docs:
+      terms_of_service:
+        version: {{ .Values.sydent.terms.termsOfService.version | quote }}
+        langs:
+          {{- range $lang, $entry := .Values.sydent.terms.termsOfService.langs }}
+          {{ $lang }}:
+            name: {{ $entry.name | quote }}
+            url: {{ $entry.url | quote }}
+          {{- end }}
+      privacy_policy:
+        version: {{ .Values.sydent.terms.privacyPolicy.version | quote }}
+        langs:
+          {{- range $lang, $entry := .Values.sydent.terms.privacyPolicy.langs }}
+          {{ $lang }}:
+            name: {{ $entry.name | quote }}
+            url: {{ $entry.url | quote }}
+          {{- end }}
+  {{- end }}
 {{- end }}
