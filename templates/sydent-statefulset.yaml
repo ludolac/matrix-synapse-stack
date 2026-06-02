@@ -107,6 +107,13 @@ spec:
               mountPath: /data
             - name: templates
               mountPath: /templates/{{ .Values.sydent.brand | default "waadoo" }}
+            {{- if .Values.sydent.terms.enabled }}
+            # terms.yaml is served live ; mount the ConfigMap volume read-only
+            # so URL/version changes take effect without restarting the pod.
+            - name: config-template
+              mountPath: /config-template
+              readOnly: true
+            {{- end }}
           resources:
             {{- toYaml .Values.sydent.resources | nindent 12 }}
       volumes:
