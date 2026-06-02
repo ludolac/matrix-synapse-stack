@@ -60,11 +60,11 @@ data:
     email.invite.subject = {{ .Values.sydent.email.inviteSubject | default "%(sender_display_name)s has invited you to chat on Waadoo Matrix" | quote }}
     email.invite.subject_space = {{ .Values.sydent.email.inviteSubjectSpace | default "%(sender_display_name)s has invited you to a space on Waadoo Matrix" | quote }}
     email.smtphost = {{ .Values.sydent.email.smtp.host | required ".Values.sydent.email.smtp.host is required" }}
-    email.smtpport = {{ .Values.sydent.email.smtp.port | default 25 | quote }}
+    email.smtpport = {{ .Values.sydent.email.smtp.port | default 25 }}
     email.smtpusername = {{ .Values.sydent.email.smtp.username | default "" }}
     email.smtppassword = {{ .Values.sydent.email.smtp.password | default "" }}
     email.hostname =
-    email.tlsmode = {{ .Values.sydent.email.smtp.tlsmode | default "0" | quote }}
+    email.tlsmode = {{ .Values.sydent.email.smtp.tlsmode | default "0" }}
     # IMPORTANT : fallback URL when Synapse does not pass web_client_location.
     # Pointed at our Element so the invite link in emails opens our hosted UI
     # instead of app.element.io. Override per env in umbrella chart.
