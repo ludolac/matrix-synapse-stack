@@ -124,6 +124,20 @@ data:
             localpart:
               action: require
               template: {{ $claims.localpart | default "{{ user.preferred_username }}" | quote }}
+              {{- /*
+              on_conflict gates behavior when the claim-derived localpart is
+              already taken by another MAS user. Values:
+                fail (default)  abort the upstream OAuth flow with a 4xx
+                add             auto-link the upstream identity to the
+                                existing user (REQUIRED for the LLDAP -> MAS
+                                pre-provisioning pattern, otherwise MAS
+                                throws "Configuration doesn't allow for
+                                automatic linking of existing users" and
+                                falls back to /register/.../token).
+              */ -}}
+              {{- with $claims.localpartOnConflict }}
+              on_conflict: {{ . | quote }}
+              {{- end }}
             displayname:
               action: suggest
               template: {{ $claims.displayname | default "{{ user.name }}" | quote }}

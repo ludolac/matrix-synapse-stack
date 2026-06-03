@@ -52,6 +52,8 @@ annotations:
   #   mas-cli. No in-place migration is provided — wipe + redeploy is expected.
   artifacthub.io/changes: |
     - kind: added
+      description: "mas.upstreamOauth2.providers[].claimsImports.localpartOnConflict : optional knob mapped to claims_imports.localpart.on_conflict. Required value when running a LLDAP→MAS pre-provisioning CronJob alongside upstream OAuth — without on_conflict: add, MAS refuses to link an existing MAS user to the incoming OAuth identity and falls back to the /register/finish path (which prompts for registration_token even though the user is already pre-provisioned)."
+    - kind: added
       description: "mas.extraClients + mas.policy.adminClients : declare extra OAuth2 clients in MAS config and grant them admin scope (urn:mas:admin). Enables sidecar automation flows (CronJob LLDAP→MAS pre-provisioning to avoid the registration_token prompt at first SSO login — see element-hq/matrix-authentication-service finish.rs:124 hardcoded token check across both password + upstream OAuth flows)."
     - kind: added
       description: "sydent.email.logoUrl : optional brand logo URL embedded at the top of invite + verification HTML emails (PNG/SVG via HTTPS). Most clients block remote images by default — recipients have to click 'Show images' to see it. Default empty (logo block omitted)."
