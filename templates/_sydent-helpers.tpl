@@ -32,7 +32,15 @@ Pour rejoindre la conversation, cliquez sur le lien ci-dessous :
 
 {{ $joinUrl }}
 
-Vous n'avez pas encore de compte ? Pas de problème : le lien vous proposera d'en créer un automatiquement.
+Vous n'avez pas encore de compte ? L'inscription se fait en 2 étapes :
+
+  1. Le lien ci-dessus vous amène sur la page d'inscription. Vous devrez
+     y saisir un CODE D'INVITATION (token d'enregistrement) fourni
+     séparément par Waadoo. Si vous n'en avez pas, contactez la personne
+     qui vous a invité ou écrivez à contact@waadoo.ovh.
+
+  2. Une fois le code saisi, vous recevrez un SECOND EMAIL contenant un
+     code de vérification à 6 chiffres pour confirmer cette adresse.
 
 ---
 Waadoo Matrix
@@ -75,8 +83,12 @@ Content-Disposition: inline
       .button { display: inline-block; background-color: #0dbd8b; color: #ffffff !important; padding: 14px 36px; text-decoration: none; font-weight: 600; border-radius: 8px; font-size: 16px; box-shadow: 0 2px 4px rgba(13,189,139,0.25); }
       .fallback-label { font-size: 13px; color: #6b7280; text-align: center; margin-bottom: 8px; }
       .fallback { font-size: 12px; color: #4b5563; word-break: break-all; padding: 12px 14px; background-color: #f5f6f7; border-radius: 6px; font-family: ui-monospace, "SF Mono", monospace; }
-      .info { background-color: #eef9f5; border-radius: 8px; padding: 14px 16px; margin-top: 28px; font-size: 14px; color: #0a5d4a; }
+      .info { background-color: #eef9f5; border-radius: 8px; padding: 16px 18px; margin-top: 28px; font-size: 14px; color: #0a5d4a; }
       .info b { color: #0dbd8b; }
+      .info ol { padding-left: 22px; margin: 10px 0 0; }
+      .info ol li { margin-bottom: 8px; }
+      .info ol li:last-child { margin-bottom: 0; }
+      .info .step-label { display: inline-block; background-color: #0dbd8b; color: #ffffff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-right: 6px; letter-spacing: 0.05em; text-transform: uppercase; }
       .footer { padding: 20px 24px; text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; line-height: 1.6; }
       .footer a { color: #6b7280; text-decoration: none; }
       .footer .sep { color: #d1d5db; padding: 0 6px; }
@@ -124,12 +136,24 @@ Content-Disposition: inline
               <div class="fallback">{{ $joinUrl }}</div>
 
               <div class="info">
-                <p style="margin:0;">
-                  <b>Pourquoi je reçois cet email ?</b><br>
-                  Waadoo Matrix est notre messagerie d'équipe sécurisée.
-                  Si vous n'avez pas encore de compte, le lien ci-dessus vous proposera
-                  d'en créer un automatiquement (gratuit, quelques secondes).
-                </p>
+                <p style="margin:0 0 6px;"><b>Pas encore de compte ? Inscription en 2 étapes :</b></p>
+                <ol>
+                  <li>
+                    <span class="step-label">Étape 1</span>
+                    Le lien ci-dessus vous amène sur la page d'inscription. Saisissez
+                    le <b>code d'invitation</b> (token d'enregistrement) fourni
+                    séparément par Waadoo. Vous ne l'avez pas ?
+                    Demandez-le à la personne qui vous a invité, ou écrivez à
+                    <a href="mailto:contact@waadoo.ovh">contact@waadoo.ovh</a>.
+                  </li>
+                  <li>
+                    <span class="step-label">Étape 2</span>
+                    Vous recevrez ensuite un <b>second email</b> contenant un
+                    code à 6 chiffres pour vérifier cette adresse. Saisissez-le
+                    sur la page d'inscription pour finaliser la création du
+                    compte.
+                  </li>
+                </ol>
               </div>
             </div>
             <div class="footer">
