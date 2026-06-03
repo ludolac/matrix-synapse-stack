@@ -3,7 +3,7 @@ name: matrix-synapse
 description: Helm chart for a full Matrix stack (Synapse, Element Web, MAS, Element Call, Coturn, CloudNativePG) on Kubernetes
 type: application
 version: 2.0.50
-appVersion: "1.151.0"
+appVersion: "1.153.0"
 keywords:
   - matrix
   - synapse
@@ -51,6 +51,8 @@ annotations:
   #   blocks are removed (they conflict with MSC3861). Admin creation moves to
   #   mas-cli. No in-place migration is provided — wipe + redeploy is expected.
   artifacthub.io/changes: |
+    - kind: changed
+      description: "Default image bumps to current stable releases : synapse v1.151.0 -> v1.153.0 (CVE-2026-45076/45078 patched), matrix-authentication-service 1.15.0 -> 1.17.0, element-web develop@sha (unstable pin) -> v1.12.20 stable, element-call v0.19.2 -> v0.20.0, livekit-server v1.11.0 -> v1.12.0, coturn 4.10-alpine -> 4.12-alpine, nginx 1.25-alpine -> 1.30-alpine, ketesa default v1.2.0 -> v1.2.1 (fix react-admin useListContext crash). chart appVersion follows synapse (1.153.0). MAS knobs validated for 1.17 : claims_imports.localpart.on_conflict, policy.data.admin_clients, /api/admin/v1/users all stable."
     - kind: added
       description: "mas.upstreamOauth2.providers[].claimsImports.localpartOnConflict : optional knob mapped to claims_imports.localpart.on_conflict. Required value when running a LLDAP→MAS pre-provisioning CronJob alongside upstream OAuth — without on_conflict: add, MAS refuses to link an existing MAS user to the incoming OAuth identity and falls back to the /register/finish path (which prompts for registration_token even though the user is already pre-provisioned)."
     - kind: added

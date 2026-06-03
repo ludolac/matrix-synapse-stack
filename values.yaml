@@ -28,7 +28,7 @@ synapse:
   image:
     # Using GitHub Container Registry to avoid Docker Hub rate limits
     repository: ghcr.io/element-hq/synapse
-    tag: "v1.151.0"
+    tag: "v1.153.0"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -367,7 +367,7 @@ element:
 
   image:
     repository: ghcr.io/element-hq/element-web
-    tag: "develop@sha256:0c1155965c42610cfc73d875173565355a588e3caf52e72f9a3fd1bad5744324"
+    tag: "v1.12.20"
     pullPolicy: IfNotPresent
 
   replicaCount: 2
@@ -536,7 +536,7 @@ wellknown:
 
   image:
     repository: nginx
-    tag: "1.25-alpine"
+    tag: "1.30-alpine"
     pullPolicy: IfNotPresent
 
   resources:
@@ -906,7 +906,7 @@ coturn:
   # Coturn container image
   image:
     repository: coturn/coturn
-    tag: "4.10-alpine"
+    tag: "4.12-alpine"
     pullPolicy: IfNotPresent
 
   imagePullSecrets: []
@@ -1152,7 +1152,7 @@ mas:
 
   image:
     repository: ghcr.io/element-hq/matrix-authentication-service
-    tag: "1.15.0"
+    tag: "1.17.0"
     pullPolicy: IfNotPresent
 
   # 2 replicas by default — MAS is in the hot path of every OAuth2 token
@@ -1322,7 +1322,7 @@ synapseAdmin:
     # New canonical image path (project rename — see upstream:
     # https://github.com/etkecc/ketesa).
     repository: ghcr.io/etkecc/ketesa
-    tag: "v1.2.0"
+    tag: "v1.2.1"
     pullPolicy: IfNotPresent
 
   replicaCount: 1
@@ -1426,7 +1426,7 @@ rtc:
   livekit:
     image:
       repository: livekit/livekit-server
-      tag: "v1.11.0"
+      tag: "v1.12.0"
       pullPolicy: IfNotPresent
     replicaCount: 1
 
@@ -1613,7 +1613,7 @@ rtc:
   elementCall:
     image:
       repository: ghcr.io/element-hq/element-call
-      tag: "v0.19.2"
+      tag: "v0.20.0"
       pullPolicy: IfNotPresent
     replicaCount: 1
 
