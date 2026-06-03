@@ -492,6 +492,11 @@ ingress:
         pathType: Prefix
     tls:
       secretName: matrix-element-tls
+    # Per-ingress annotations merged on top of ingress.annotations. Use this
+    # to attach Traefik middlewares specific to Element Web (e.g. a CSP
+    # override allowing blob: URLs for decrypted E2EE attachments inline
+    # rendering and downloads).
+    annotations: {}
 
   # Federation (port 8448)
   federation:
