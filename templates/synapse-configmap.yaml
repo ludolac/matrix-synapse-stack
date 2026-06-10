@@ -109,6 +109,18 @@ data:
     # to get the full preview metadata.
     url_preview_user_agent: {{ . | quote }}
     {{- end }}
+    {{- if .Values.synapse.server.urlPreviews.oembedAdditionalProviders }}
+    # Additional oEmbed providers. Synapse ships a minimal default (X,
+    # YouTube Shorts only) - YouTube classic URLs (/watch?v=, youtu.be/)
+    # are NOT covered, so previews fall back to scraping HTML, which fails
+    # on sites with consent walls or anti-bot detection (YouTube returns
+    # a stripped HTML without og:image -> preview ends up using the
+    # favicon -> client gets 400 M_NOT_FOUND on /_matrix/media/v3/thumbnail).
+    # See providers.json content rendered in this same ConfigMap below.
+    oembed:
+      additional_providers:
+        - "/config/oembed-providers.json"
+    {{- end }}
     {{- end }}
 
     {{- with .Values.synapse.server.roomListPublicationRules }}
@@ -390,3 +402,13 @@ data:
         level: INFO
         handlers: [console]
     disable_existing_loggers: false
+{{- with .Values.synapse.server.urlPreviews.oembedAdditionalProviders }}
+
+  # oEmbed providers additionnels (cf homeserver-override.yaml oembed.additional_providers).
+  # Format conforme a https://oembed.com/ - liste de { provider_name, provider_url,
+  # endpoints: [{ schemes, url }] }. Synapse fait un GET sur l'endpoint oEmbed
+  # (ex: https://www.youtube.com/oembed?url=<url>&format=json) au lieu de
+  # scraper le HTML, ce qui contourne les consent walls et bot detection.
+  oembed-providers.json: |
+{{ toJson . | indent 4 }}
+{{- end }}

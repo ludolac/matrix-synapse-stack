@@ -131,6 +131,18 @@ synapse:
       # avoids this. Empty string (default) keeps the upstream
       # Synapse UA.
       userAgent: ""
+      # Additional oEmbed providers (https://oembed.com/) in JSON format.
+      # Synapse's default providers.json ships only X + YouTube Shorts.
+      # YouTube classic URLs (youtube.com/watch, youtu.be) need to be
+      # added here to bypass the consent wall that breaks HTML scraping.
+      # Each entry must follow the oEmbed provider schema :
+      #   - provider_name: string
+      #     provider_url: string
+      #     endpoints:
+      #       - schemes: [list of URL globs]
+      #         url: <oEmbed endpoint URL>
+      # Empty list (default) disables this feature.
+      oembedAdditionalProviders: []
 
     # Who can publish a room into the public directory. Matches Synapse's
     # `room_list_publication_rules` verbatim — an ordered list of
