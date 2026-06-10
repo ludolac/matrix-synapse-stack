@@ -121,6 +121,16 @@ synapse:
     # URL previews
     urlPreviews:
       enabled: true
+      # Custom User-Agent for URL preview fetch. Default Synapse UA
+      # (`Synapse/<version>`) gets blocked or rate-limited by some
+      # sites — notably YouTube returns a stripped HTML without
+      # `<meta property="og:image">` when it detects a bot, so the
+      # preview ends up using just the favicon (which fails
+      # thumbnailing -> client gets 400 M_NOT_FOUND on
+      # `/_matrix/media/v3/thumbnail/...`). Setting a real browser UA
+      # avoids this. Empty string (default) keeps the upstream
+      # Synapse UA.
+      userAgent: ""
 
     # Who can publish a room into the public directory. Matches Synapse's
     # `room_list_publication_rules` verbatim — an ordered list of

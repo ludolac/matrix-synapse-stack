@@ -102,6 +102,13 @@ data:
       - 'ff00::/8'         # IPv6 multicast
       - 'fec0::/10'        # IPv6 site-local (deprecated)
     max_spider_size: 10M  # Maximum size of content to download for previews
+    {{- with .Values.synapse.server.urlPreviews.userAgent }}
+    # Custom User-Agent for URL preview fetch. Default Synapse UA gets
+    # blocked/limited by some sites (YouTube returns a stripped HTML
+    # without og:image when it detects a bot). Set to a real browser UA
+    # to get the full preview metadata.
+    url_preview_user_agent: {{ . | quote }}
+    {{- end }}
     {{- end }}
 
     {{- with .Values.synapse.server.roomListPublicationRules }}
